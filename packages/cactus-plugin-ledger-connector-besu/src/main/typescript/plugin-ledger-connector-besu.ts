@@ -1,6 +1,7 @@
 import { Server } from "http";
 import { Server as SecureServer } from "https";
 
+import type { WebsocketProvider } from "web3-core";
 import type { Server as SocketIoServer } from "socket.io";
 import type { Socket as SocketIoSocket } from "socket.io";
 import type { Express } from "express";
@@ -10,7 +11,6 @@ import OAS from "../json/openapi.json";
 
 import Web3 from "web3";
 
-import type { WebsocketProvider } from "web3-core";
 import EEAClient, { ICallOptions, IWeb3InstanceExtended } from "web3-eea";
 
 import { Contract, ContractSendMethod } from "web3-eth-contract";
@@ -118,10 +118,10 @@ export class PluginLedgerConnectorBesu
   private readonly instanceId: string;
   public prometheusExporter: PrometheusExporter;
   private readonly log: Logger;
-  private readonly web3Provider: WebsocketProvider;
   private readonly web3: Web3;
   private web3EEA: IWeb3InstanceExtended | undefined;
   private readonly pluginRegistry: PluginRegistry;
+  private readonly web3WsProvider: WebsocketProvider;
   private contracts: {
     [name: string]: Contract;
   } = {};
@@ -147,10 +147,10 @@ export class PluginLedgerConnectorBesu
     const label = this.className;
     this.log = LoggerProvider.getOrCreate({ level, label });
 
-    this.web3Provider = new Web3.providers.WebsocketProvider(
+    this.web3WsProvider = new Web3.providers.WebsocketProvider(
       this.options.rpcApiWsHost,
     );
-    this.web3 = new Web3(this.web3Provider);
+    this.web3 = new Web3(this.web3WsProvider);
     this.instanceId = options.instanceId;
     this.pluginRegistry = options.pluginRegistry;
     this.prometheusExporter =
@@ -189,6 +189,7 @@ export class PluginLedgerConnectorBesu
 
   public async shutdown(): Promise<void> {
     this.log.info(`Shutting down ${this.className}...`);
+    this.web3WsProvider.disconnect(0, "Shutting down gracefully.");
   }
 
   async registerWebServices(

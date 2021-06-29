@@ -1,5 +1,5 @@
-import test, { Test } from "tape";
 import { v4 as uuidv4 } from "uuid";
+import "jest-extended";
 import { LoggerProvider } from "../../../../main/typescript/public-api";
 
 // FIXME(2020-11-12) this does not work because for some reason the stdout
@@ -7,7 +7,7 @@ import { LoggerProvider } from "../../../../main/typescript/public-api";
 // Suspecting that the test runner library does some internal magic with
 // piping the stream somewhere else or similar foul play at hand.
 // Until we can fix this, marked the test to be skipped.
-test.skip("Logger#debug/error writes to stdout/stderr", async (t: Test) => {
+test.skip("Logger#debug/error writes to stdout/stderr", async () => {
   const log = LoggerProvider.getOrCreate({
     level: "TRACE",
     label: "logger-test",
@@ -57,8 +57,5 @@ test.skip("Logger#debug/error writes to stdout/stderr", async (t: Test) => {
   }
 
   process.stdout.off("data", stdOutDataHandler as any);
-  t.comment(`Aggregate std out messages: ${aggregateStdOut}`);
-  t.true(didNotThrow, "Marker appeared on stdout on time OK");
-
-  t.end();
+  expect(didNotThrow).toBe(true);
 });

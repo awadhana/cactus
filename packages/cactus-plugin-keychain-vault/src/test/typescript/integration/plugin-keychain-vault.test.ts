@@ -1,5 +1,6 @@
-import test, { Test } from "tape-promise/tape";
 import { v4 as internalIpV4 } from "internal-ip";
+import "jest-extended";
+import test, { Test } from "tape-promise/tape";
 
 import express from "express";
 import bodyParser from "body-parser";
@@ -34,6 +35,8 @@ import { DefaultApi as KeychainVaultApi } from "../../../main/typescript/public-
 const logLevel: LogLevelDesc = "TRACE";
 
 test("get,set,has,delete alters state", async (t: Test) => {
+  t.comment("I'm just here for the error of no t in the method");
+
   const vaultTestContainer = new VaultTestServer({});
   await vaultTestContainer.start();
 
@@ -73,9 +76,6 @@ test("get,set,has,delete alters state", async (t: Test) => {
   test.onFinish(async () => await Servers.shutdown(server));
   const { address, port } = addressInfo;
   const apiHost = `http://${address}:${port}`;
-  t.comment(
-    `Metrics URL: ${apiHost}/api/v1/plugins/@hyperledger/cactus-plugin-keychain-vault/get-prometheus-exporter-metrics`,
-  );
 
   const apiConfig = new Configuration({ basePath: apiHost });
   const apiClient = new KeychainVaultApi(apiConfig);
@@ -83,32 +83,32 @@ test("get,set,has,delete alters state", async (t: Test) => {
   await plugin.getOrCreateWebServices();
   await plugin.registerWebServices(expressApp);
 
-  t.equal(plugin.getKeychainId(), options.keychainId, "Keychain ID set OK");
-  t.equal(plugin.getInstanceId(), options.instanceId, "Instance ID set OK");
+  expect(plugin.getKeychainId()).toEqual(options.keychainId);
+  expect(plugin.getInstanceId()).toEqual(options.instanceId);
 
   const key1 = uuidv4();
   const value1 = uuidv4();
 
   const hasPrior1 = await plugin.has(key1);
 
-  t.false(hasPrior1, "hasPrior === false OK");
+  expect(hasPrior1).not.toBe(true);
 
   await plugin.set(key1, value1);
 
   const hasAfter1 = await plugin.has(key1);
-  t.true(hasAfter1, "hasAfter === true OK");
+  expect(hasAfter1).toBe(true);
 
   const valueAfter1 = await plugin.get(key1);
-  t.ok(valueAfter1, "valueAfter truthy OK");
-  t.equal(valueAfter1, value1, "valueAfter === value OK");
+  expect(valueAfter1).toBeTruthy();
+  expect(valueAfter1).toEqual(value1);
 
   await plugin.delete(key1);
 
   const hasAfterDelete1 = await plugin.has(key1);
-  t.false(hasAfterDelete1, "hasAfterDelete === false OK");
+  expect(hasAfterDelete1).not.toBe(true);
 
   const valueAfterDelete1 = await plugin.get(key1);
-  t.notok(valueAfterDelete1, "valueAfterDelete falsy OK");
+  expect(valueAfterDelete1).not.toBe(true);
 
   {
     const res = await apiClient.getPrometheusMetricsV1();
@@ -123,13 +123,10 @@ test("get,set,has,delete alters state", async (t: Test) => {
       '{type="' +
       K_CACTUS_KEYCHAIN_VAULT_MANAGED_KEY_COUNT +
       '"} 0';
-    t.ok(res);
-    t.ok(res.data);
-    t.equal(res.status, 200);
-    t.true(
-      res.data.includes(promMetricsOutput),
-      "Total Key Count 0 recorded as expected. RESULT OK",
-    );
+    expect(res).toBeTruthy();
+    expect(res.data).toBeTruthy();
+    expect(res.status).toEqual(200);
+    expect(res.data.includes(promMetricsOutput)).toBe(true);
   }
 
   const key2 = uuidv4();
@@ -137,16 +134,16 @@ test("get,set,has,delete alters state", async (t: Test) => {
 
   const hasPrior2 = await plugin.has(key2);
 
-  t.false(hasPrior2, "hasPrior === false OK");
+  expect(hasPrior2).not.toBe(true);
 
   await plugin.set(key2, value2);
 
   const hasAfter2 = await plugin.has(key2);
-  t.true(hasAfter2, "hasAfter === true OK");
+  expect(hasAfter2).toBe(true);
 
   const valueAfter2 = await plugin.get(key2);
-  t.ok(valueAfter2, "valueAfter2 truthy OK");
-  t.equal(valueAfter2, value2, "valueAfter2 === value OK");
+  expect(valueAfter2).toBeTruthy();
+  expect(valueAfter2).toEqual(value2);
 
   {
     const res = await apiClient.getPrometheusMetricsV1();
@@ -161,19 +158,14 @@ test("get,set,has,delete alters state", async (t: Test) => {
       '{type="' +
       K_CACTUS_KEYCHAIN_VAULT_MANAGED_KEY_COUNT +
       '"} 1';
-    t.ok(res);
-    t.ok(res.data);
-    t.equal(res.status, 200);
-    t.true(
-      res.data.includes(promMetricsOutput),
-      "Total Key Count 1 recorded as expected. RESULT OK",
-    );
+    expect(res).toBeTruthy();
+    expect(res.data).toBeTruthy();
+    expect(res.status).toEqual(200);
+    expect(res.data.includes(promMetricsOutput)).toBe(true);
   }
-
-  t.end();
 });
 
-test("API client get,set,has,delete alters state", async (t: Test) => {
+test("API client get,set,has,delete alters state", async () => {
   const vaultTestContainer = new VaultTestServer({});
   await vaultTestContainer.start();
 
@@ -220,42 +212,36 @@ test("API client get,set,has,delete alters state", async (t: Test) => {
   await plugin.getOrCreateWebServices();
   await plugin.registerWebServices(expressApp);
 
-  t.equal(plugin.getKeychainId(), options.keychainId, "Keychain ID set OK");
-  t.equal(plugin.getInstanceId(), options.instanceId, "Instance ID set OK");
+  expect(plugin.getKeychainId()).toEqual(options.keychainId);
+  expect(plugin.getInstanceId()).toEqual(options.instanceId);
 
   const key1 = uuidv4();
   const value1 = uuidv4();
 
   const hasPrior1 = await apiClient.hasKeychainEntryV1({ key: key1 });
-  t.ok(hasPrior1, "hasPrior1 truthy OK");
+  expect(hasPrior1).toBeTruthy();
 
-  t.false(hasPrior1.data.isPresent, "hasPrior1.data.isPresent === false OK");
+  expect(hasPrior1.data.isPresent).not.toBe(true);
 
   await apiClient.setKeychainEntryV1({ key: key1, value: value1 });
 
   const hasAfter1 = await apiClient.hasKeychainEntryV1({ key: key1 });
-  t.ok(hasAfter1, "hasAfter1 truthy OK");
-  t.true(hasAfter1.data.isPresent, "hasAfter1.data.isPresent === true OK");
+  expect(hasAfter1).toBeTruthy();
+  expect(hasAfter1.data.isPresent).toBe(true);
 
   const valueAfter1 = await apiClient.getKeychainEntryV1({ key: key1 });
-  t.ok(valueAfter1, "valueAfter1 truthy OK");
-  t.equal(valueAfter1.data.value, value1, "valueAfter1.data.value EQ value OK");
+  expect(valueAfter1).toBeTruthy();
+  expect(valueAfter1.data.value).toEqual(value1);
 
   await apiClient.deleteKeychainEntryV1({ key: key1 });
 
   const hasAfterDelete1 = await apiClient.hasKeychainEntryV1({ key: key1 });
-  t.ok(hasAfterDelete1, "hasAfterDelete1 truthy OK");
-  t.false(
-    hasAfterDelete1.data.isPresent,
-    "hasAfterDelete1.data.isPresent === false OK",
-  );
+  expect(hasAfterDelete1).toBeTruthy();
+  expect(hasAfterDelete1.data.isPresent).not.toBe(true);
 
   const valueAfterDelete1 = await apiClient.getKeychainEntryV1({ key: key1 });
-  t.ok(valueAfterDelete1, "valueAfterDelete1 truthy OK");
-  t.notok(
-    valueAfterDelete1.data.value,
-    "valueAfterDelete1.data.value falsy OK",
-  );
+  expect(valueAfterDelete1).toBeTruthy();
+  expect(valueAfterDelete1.data.value).not.toBe(true);
 
   {
     const res = await apiClient.getPrometheusMetricsV1();
@@ -270,30 +256,27 @@ test("API client get,set,has,delete alters state", async (t: Test) => {
       '{type="' +
       K_CACTUS_KEYCHAIN_VAULT_MANAGED_KEY_COUNT +
       '"} 0';
-    t.ok(res);
-    t.ok(res.data);
-    t.equal(res.status, 200);
-    t.true(
-      res.data.includes(promMetricsOutput),
-      "Total Key Count 0 recorded as expected. RESULT OK",
-    );
+    expect(res).toBeTruthy();
+    expect(res.data).toBeTruthy();
+    expect(res.status).toEqual(200);
+    expect(res.data.includes(promMetricsOutput)).toBeTruthy();
   }
 
   const key2 = uuidv4();
   const value2 = uuidv4();
 
   const hasPrior2 = await apiClient.hasKeychainEntryV1({ key: key2 });
-  t.ok(hasPrior2, "hasPrior2 API response truthy OK");
-  t.false(hasPrior2.data.isPresent, "hasPrior2.data.isPresent EQ false OK");
+  expect(hasPrior2).toBeTruthy();
+  expect(hasPrior2.data.isPresent).not.toBe(true);
 
   await apiClient.setKeychainEntryV1({ key: key2, value: value2 });
 
   const hasAfter2 = await apiClient.hasKeychainEntryV1({ key: key2 });
-  t.true(hasAfter2, "hasAfter === true OK");
+  expect(hasAfter2).toBe(true);
 
   const valueAfter2 = await apiClient.getKeychainEntryV1({ key: key2 });
-  t.ok(valueAfter2, "valueAfter2 API response truthy OK");
-  t.equal(valueAfter2.data.value, value2, "valueAfter2.data.value EQ value OK");
+  expect(valueAfter2).toBeTruthy();
+  expect(valueAfter2.data.value).toEqual(value2);
 
   {
     const res = await apiClient.getPrometheusMetricsV1();
@@ -308,19 +291,14 @@ test("API client get,set,has,delete alters state", async (t: Test) => {
       '{type="' +
       K_CACTUS_KEYCHAIN_VAULT_MANAGED_KEY_COUNT +
       '"} 1';
-    t.ok(res);
-    t.ok(res.data);
-    t.equal(res.status, 200);
-    t.true(
-      res.data.includes(promMetricsOutput),
-      "Total Key Count 1 recorded as expected. RESULT OK",
-    );
+    expect(res).toBeTruthy();
+    expect(res.data).toBeTruthy();
+    expect(res.status).toEqual(200);
+    expect(res.data.includes(promMetricsOutput)).toBe(true);
   }
-
-  t.end();
 });
 
-test("getEncryptionAlgorithm() returns null", (t: Test) => {
+test("getEncryptionAlgorithm() returns null", () => {
   const options: IPluginKeychainVaultOptions = {
     instanceId: uuidv4(),
     keychainId: uuidv4(),
@@ -329,7 +307,5 @@ test("getEncryptionAlgorithm() returns null", (t: Test) => {
   };
   const plugin = new PluginKeychainVault(options);
 
-  t.ok(plugin.getEncryptionAlgorithm(), "encryption algorithm truthy OK");
-
-  t.end();
+  expect(plugin.getEncryptionAlgorithm());
 });

@@ -1,8 +1,8 @@
 import http from "http";
 import type { AddressInfo } from "net";
-import test, { Test } from "tape-promise/tape";
 import { v4 as uuidv4 } from "uuid";
 import express from "express";
+import "jest-extended";
 import bodyParser from "body-parser";
 import {
   Configuration,
@@ -35,7 +35,7 @@ import DemoHelperJSON from "../../../solidity/token-erc20-contract/DemoHelpers.j
 import HashTimeLockJSON from "../../../../../../cactus-plugin-htlc-eth-besu-erc20/src/main/solidity/contracts/HashedTimeLockContract.json";
 import { PluginKeychainMemory } from "@hyperledger/cactus-plugin-keychain-memory";
 
-const logLevel: LogLevelDesc = "INFO";
+const logLevel: LogLevelDesc = "TRACE";
 const estimatedGas = 6721975;
 const expiration = 2147483648;
 const besuTestLedger = new BesuTestLedger({ logLevel });
@@ -46,34 +46,57 @@ const firstHighNetWorthAccount = "0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1";
 const privateKey =
   "0x4f3edf983ac636a65a842ce7c78d9aa706d3b113bce9c46f30d7d21715b23b1d";
 const connectorId = uuidv4();
+const keychainId = uuidv4();
+const expressApp = express();
+expressApp.use(bodyParser.json({ limit: "250mb" }));
+const testCase = "get invalid id single status";
+const server = http.createServer(expressApp);
+
+let addressInfo,
+  address: string,
+  port: number,
+  apiHost,
+  configuration,
+  api: BesuApi,
+  connector: PluginLedgerConnectorBesu;
+
 const web3SigningCredential: Web3SigningCredential = {
   ethAccount: firstHighNetWorthAccount,
   secret: privateKey,
   type: Web3SigningCredentialType.PrivateKeyHex,
 } as Web3SigningCredential;
 
-const testCase = "get invalid id single status";
-
-test("BEFORE " + testCase, async (t: Test) => {
-  const pruning = pruneDockerAllIfGithubAction({ logLevel });
-  await t.doesNotReject(pruning, "Pruning did not throw OK");
-  t.end();
-});
-
-test(testCase, async (t: Test) => {
-  t.comment("Starting Besu Test Ledger");
-  const besuTestLedger = new BesuTestLedger({ logLevel });
-
-  test.onFinish(async () => {
-    await besuTestLedger.stop();
-    await besuTestLedger.destroy();
-    await pruneDockerAllIfGithubAction({ logLevel });
-  });
+beforeAll(async () => {
   await besuTestLedger.start();
 
+  const listenOptions: IListenOptions = {
+    hostname: "0.0.0.0",
+    port: 0,
+    server,
+  };
+  addressInfo = (await Servers.listen(listenOptions)) as AddressInfo;
+  ({ address, port } = addressInfo);
+  apiHost = `http://${address}:${port}`;
+  configuration = new Configuration({ basePath: apiHost });
+  api = new BesuApi(configuration);
+});
+
+test("BEFORE " + testCase, async () => {
+  const pruning = pruneDockerAllIfGithubAction({ logLevel });
+  await expect(pruning).resolves.toBeTruthy();
+});
+
+afterAll(async () => {
+  await besuTestLedger.stop();
+  await besuTestLedger.destroy();
+});
+
+afterAll(async () => await Servers.shutdown(server));
+afterAll(async () => await connector.shutdown());
+
+test(testCase, async () => {
   const rpcApiHttpHost = await besuTestLedger.getRpcApiHttpHost();
   const rpcApiWsHost = await besuTestLedger.getRpcApiWsHost();
-  const keychainId = uuidv4();
   const keychainPlugin = new PluginKeychainMemory({
     instanceId: uuidv4(),
     keychainId,
@@ -99,7 +122,7 @@ test(testCase, async (t: Test) => {
   });
 
   const pluginRegistry = new PluginRegistry({});
-  const connector: PluginLedgerConnectorBesu = await factory.create({
+  connector = await factory.create({
     rpcApiHttpHost,
     rpcApiWsHost,
     logLevel,
@@ -120,26 +143,9 @@ test(testCase, async (t: Test) => {
   const pluginHtlc = await factoryHTLC.create(pluginOptions);
   pluginRegistry.add(pluginHtlc);
 
-  const expressApp = express();
-  expressApp.use(bodyParser.json({ limit: "250mb" }));
-  const server = http.createServer(expressApp);
-  const listenOptions: IListenOptions = {
-    hostname: "0.0.0.0",
-    port: 0,
-    server,
-  };
-  const addressInfo = (await Servers.listen(listenOptions)) as AddressInfo;
-  test.onFinish(async () => await Servers.shutdown(server));
-  const { address, port } = addressInfo;
-  const apiHost = `http://${address}:${port}`;
-
-  const configuration = new Configuration({ basePath: apiHost });
-  const api = new BesuApi(configuration);
-
   await pluginHtlc.getOrCreateWebServices();
   await pluginHtlc.registerWebServices(expressApp);
 
-  t.comment("Deploys HashTimeLock via .json file on initialize function");
   const initRequest: InitializeRequest = {
     connectorId,
     keychainId,
@@ -149,19 +155,12 @@ test(testCase, async (t: Test) => {
   };
   const deployOut = await pluginHtlc.initialize(initRequest);
 
-  t.ok(deployOut, "pluginHtlc.initialize() output is truthy OK");
-  t.ok(
-    deployOut.transactionReceipt,
-    "pluginHtlc.initialize() output.transactionReceipt is truthy OK",
-  );
-  t.ok(
-    deployOut.transactionReceipt.contractAddress,
-    "pluginHtlc.initialize() output.transactionReceipt.contractAddress is truthy OK",
-  );
+  expect(deployOut).toBeTruthy();
+  expect(deployOut.transactionReceipt).toBeTruthy();
+  expect(deployOut.transactionReceipt.contractAddress).toBeTruthy();
   const hashTimeLockAddress = deployOut.transactionReceipt
     .contractAddress as string;
 
-  t.comment("Deploys TestToken via .json file on deployContract function");
   const deployOutToken = await connector.deployContract({
     contractName: TestTokenJSON.contractName,
     contractAbi: TestTokenJSON.abi,
@@ -171,19 +170,11 @@ test(testCase, async (t: Test) => {
     constructorArgs: ["100", "token", "2", "TKN"],
     gas: estimatedGas,
   });
-  t.ok(deployOutToken, "deployContract() output is truthy OK");
-  t.ok(
-    deployOutToken.transactionReceipt,
-    "deployContract() output.transactionReceipt is truthy OK",
-  );
-  t.ok(
-    deployOutToken.transactionReceipt.contractAddress,
-    "deployContract() output.transactionReceipt.contractAddress is truthy OK",
-  );
+  expect(deployOutToken).toBeTruthy();
+  expect(deployOutToken.transactionReceipt).toBeTruthy();
+  expect(deployOutToken.transactionReceipt.contractAddress).toBeTruthy();
   const tokenAddress = deployOutToken.transactionReceipt
     .contractAddress as string;
-
-  t.comment("Approve 10 Tokens to HashTimeLockAddress");
   const { success } = await connector.invokeContract({
     contractName: TestTokenJSON.contractName,
     keychainId,
@@ -193,9 +184,8 @@ test(testCase, async (t: Test) => {
     params: [hashTimeLockAddress, "10"],
     gas: estimatedGas,
   });
-  t.equal(success, true, "approve() success is true OK");
+  expect(success).toBe(true);
 
-  t.comment("Get account balance");
   const responseBalance = await connector.invokeContract({
     contractName: TestTokenJSON.contractName,
     keychainId,
@@ -204,9 +194,8 @@ test(testCase, async (t: Test) => {
     methodName: "balanceOf",
     params: [firstHighNetWorthAccount],
   });
-  t.equal(responseBalance.callOutput, "100", "balance of account is 100 OK");
+  expect(responseBalance.callOutput).toEqual("100");
 
-  t.comment("Get HashTimeLock contract and account allowance");
   const responseAllowance = await connector.invokeContract({
     contractName: TestTokenJSON.contractName,
     keychainId,
@@ -215,9 +204,8 @@ test(testCase, async (t: Test) => {
     methodName: "allowance",
     params: [firstHighNetWorthAccount, hashTimeLockAddress],
   });
-  t.equal(responseAllowance.callOutput, "10", "callOutput() is 10 OK");
+  expect(responseAllowance.callOutput).toEqual("10");
 
-  t.comment("Create new contract for HTLC");
   const request: NewContractRequest = {
     contractAddress: hashTimeLockAddress,
     inputAmount: 10,
@@ -234,8 +222,7 @@ test(testCase, async (t: Test) => {
     gas: estimatedGas,
   };
   const resNewContract = await api.newContractV1(request);
-  t.equal(resNewContract.status, 200, "response status is OK");
-  t.comment("Get status with invalid id");
+  expect(resNewContract.status).toEqual(200);
 
   const fakeId = "0x66616b654964";
   const res = await api.getSingleStatusV1({
@@ -244,7 +231,6 @@ test(testCase, async (t: Test) => {
     connectorId,
     keychainId,
   });
-  t.equal(res.status, 200, "response status is 200 OK");
-  t.equal(res.data, 0, "the contract status is 0 - INVALID");
-  t.end();
+  expect(res.status).toEqual(200);
+  expect(res.data).toEqual(0);
 });

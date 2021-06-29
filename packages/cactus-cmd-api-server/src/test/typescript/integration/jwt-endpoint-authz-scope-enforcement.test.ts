@@ -1,6 +1,8 @@
-import test, { Test } from "tape-promise/tape";
 import { v4 as uuidv4 } from "uuid";
 import { JWK, JWT } from "jose";
+import "jest-extended";
+import test, { Test } from "tape-promise/tape";
+
 import expressJwt from "express-jwt";
 import axios, { Method } from "axios";
 import { StatusCodes } from "http-status-codes";
@@ -29,6 +31,7 @@ const log = LoggerProvider.getOrCreate({
 });
 
 test(testCase, async (t: Test) => {
+  t.comment("I'm just here for the error of no t in the method");
   try {
     const jwtKeyPair = await JWK.generate("RSA", 4096);
     const jwtPublicKey = jwtKeyPair.toPEM(false);
@@ -38,7 +41,7 @@ test(testCase, async (t: Test) => {
       audience: uuidv4(),
       issuer: uuidv4(),
     };
-    t.ok(expressJwtOptions, "Express JWT config truthy OK");
+    expect(expressJwtOptions).toBeTruthy();
 
     const unprotectedActionEp = new UnprotectedActionEndpoint({
       connector: {} as PluginLedgerConnectorStub,
@@ -83,7 +86,7 @@ test(testCase, async (t: Test) => {
       startResponse,
       "failed to start API server with dynamic plugin imports configured for it...",
     );
-    t.ok(startResponse, "startResponse truthy OK");
+    expect(startResponse).toBeTruthy();
 
     const addressInfoApi = (await startResponse).addressInfoApi;
     const protocol = apiSrvOpts.apiTlsEnabled ? "https" : "http";
@@ -117,16 +120,12 @@ test(testCase, async (t: Test) => {
         Authorization: `Bearer ${token}`,
       },
     });
-    t.ok(res1, "stub run tx response truthy OK");
-    t.equal(res1.status, 200, "stub run tx response status === 200 OK");
-    t.equal(typeof res1.data, "object", "typeof res1.data is 'object' OK");
-    t.ok(typeof res1.data.data, "res1.data.data truthy OK");
-    t.ok(typeof res1.data.data.requestId, "res1.data.data.requestId truthy OK");
-    t.equal(
-      res1.data.data.requestId,
-      req1.requestId,
-      "res1.data.requestId === req1.requestId OK",
-    );
+    expect(res1).toBeTruthy();
+    expect(res1.status).toEqual(200);
+    expect(typeof res1.data).toBe("object");
+    expect(typeof res1.data.data).toBeTruthy();
+    expect(typeof res1.data.data.requestId).toBeTruthy();
+    expect(res1.data.data.requestId).toBe(req1.requestId);
 
     try {
       const deployContractEp = new DeployContractEndpoint({
@@ -140,22 +139,17 @@ test(testCase, async (t: Test) => {
           Authorization: `Bearer ${token}`,
         },
       });
-      t.fail("deploy contract response status === 403 FAIL");
+      fail("deploy contract response status === 403 FAIL");
     } catch (out) {
-      t.ok(out, "error thrown for forbidden endpoint truthy OK");
-      t.ok(out.response, "deploy contract response truthy OK");
-      t.equal(
-        out.response.status,
-        StatusCodes.FORBIDDEN,
-        "deploy contract response status === 403 OK",
-      );
-      t.notok(out.response.data.data, "out.response.data.data falsy OK");
-      t.notok(out.response.data.success, "out.response.data.success falsy OK");
+      expect(out).toBeTruthy();
+      expect(out.response).toBeTruthy();
+      expect(out.response.status).toBe(StatusCodes.FORBIDDEN);
+      expect(out.response.data.data).not.toBeTruthy();
+      expect(out.response.data.success).not.toBeTruthy();
     }
-    t.end();
   } catch (ex) {
     log.error(ex);
-    t.fail("Exception thrown during test execution, see above for details!");
+    fail("Exception thrown during test execution, see above for details!");
     throw ex;
   }
 });

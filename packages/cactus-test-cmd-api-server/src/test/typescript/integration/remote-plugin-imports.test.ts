@@ -1,5 +1,6 @@
-import test, { Test } from "tape-promise/tape";
 import { v4 as uuidv4 } from "uuid";
+import "jest-extended";
+import test, { Test } from "tape-promise/tape";
 
 import {
   ApiServer,
@@ -33,15 +34,11 @@ test("NodeJS API server + Rust plugin work together", async (t: Test) => {
 
   const ci = await Containers.getById(vaultTestContainer.containerId);
   const vaultIpAddr = await Containers.getContainerInternalIp(ci);
-  t.comment(`Container VaultTestServer has IPv4: ${vaultIpAddr}`);
 
   test.onFinish(async () => {
     await vaultTestContainer.stop();
     await vaultTestContainer.destroy();
   });
-
-  const hostPortVault = await vaultTestContainer.getHostPortHttp();
-  t.comment(`Container VaultTestServer (Port=${hostPortVault}) started OK`);
   const vaultHost = `http://${vaultIpAddr}:${K_DEFAULT_VAULT_HTTP_PORT}`;
 
   const pluginContainer = new CactusKeychainVaultServer({
@@ -59,7 +56,6 @@ test("NodeJS API server + Rust plugin work together", async (t: Test) => {
   });
 
   const hostPort = await pluginContainer.getHostPortHttp();
-  t.comment(`CactusKeychainVaultServer (Port=${hostPort}) started OK`);
 
   const configuration = new Configuration({
     basePath: `http://localhost:${hostPort}`,
@@ -106,7 +102,5 @@ test("NodeJS API server + Rust plugin work together", async (t: Test) => {
     data: { value: actual },
   } = await apiClient.getKeychainEntryV1({ key });
 
-  t.equal(actual, expected, "Keychain stored value matches input OK");
-
-  t.end();
+  expect(actual).toEqual(expected);
 });

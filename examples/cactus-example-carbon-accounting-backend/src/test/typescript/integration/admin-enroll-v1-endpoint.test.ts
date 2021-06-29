@@ -1,7 +1,7 @@
 import { AddressInfo } from "net";
-
-import test, { Test } from "tape-promise/tape";
 import expressJwt from "express-jwt";
+import "jest-extended";
+import test, { Test } from "tape-promise/tape";
 import { v4 as uuidv4 } from "uuid";
 import { JWK, JWT } from "jose";
 import { StatusCodes } from "http-status-codes";
@@ -38,10 +38,9 @@ const log = LoggerProvider.getOrCreate({
   level: logLevel,
 });
 
-test("BEFORE " + testCase, async (t: Test) => {
+test("BEFORE " + testCase, async () => {
   const pruning = pruneDockerAllIfGithubAction({ logLevel });
-  await t.doesNotReject(pruning, "Pruning didn't throw OK");
-  t.end();
+  await expect(pruning).resolves.toBeTruthy();
 });
 
 test(testCase, async (t: Test) => {
@@ -53,17 +52,17 @@ test(testCase, async (t: Test) => {
     audience: "carbon-accounting-tool-servers-hostname-here",
     issuer: uuidv4(),
   };
-  t.ok(expressJwtOptions, "Express JWT config truthy OK");
+  expect(expressJwtOptions).toBeTruthy();
   const socketIoJwtOptions = { secret: jwtPublicKey };
 
   const httpGui = await Servers.startOnPreferredPort(3000);
-  t.true(httpGui.listening, `httpGui.listening === true`);
+  expect(httpGui.listening).toBe(true);
   const httpApi = await Servers.startOnPreferredPort(4000);
-  t.true(httpApi.listening, `httpApi.listening === true`);
+  expect(httpApi.listening).toBe(true);
   const addressInfo = httpApi.address() as AddressInfo;
-  t.ok(addressInfo, "httpApi.address() truthy OK");
-  t.ok(addressInfo.address, "httpApi.address().address truthy OK");
-  t.ok(addressInfo.port, "httpApi.address().port truthy OK");
+  expect(addressInfo).toBe(true);
+  expect(addressInfo.address).toBe(true);
+  expect(addressInfo.port).toBe(true);
   const { address, port } = addressInfo;
   const apiBaseUrl = `http://${address}:${port}`;
 
@@ -119,7 +118,7 @@ test(testCase, async (t: Test) => {
   };
   const tokenWithScope = JWT.sign(jwtPayload, jwtKeyPair, jwtSignOptions);
   const verification = JWT.verify(tokenWithScope, jwtKeyPair, jwtSignOptions);
-  t.ok(verification, "JWT with scope verification truthy OK");
+  expect(verification).toBeTruthy();
 
   const configTokenWithScope = new Configuration({
     basePath: apiBaseUrl,
@@ -135,9 +134,8 @@ test(testCase, async (t: Test) => {
   const res = await apiClient.enrollAdminV1({
     orgName: "Org1MSP",
   });
-  t.ok(res, "enrollAdminV1 response truthy OK");
-  t.true(res.status >= 200, "enrollAdminV1 status >= 200 OK");
-  t.true(res.status < 300, "enrollAdminV1 status < 300 200 OK");
+  expect(res).toBeTruthy();
+  expect(res.status).toBeWithin(200, 300);
 
   const tokenNoScope = JWT.sign({ scope: [] }, jwtKeyPair, jwtSignOptions);
 
@@ -154,18 +152,13 @@ test(testCase, async (t: Test) => {
 
   try {
     await apiClientBad.enrollAdminV1({ orgName: "does-not-matter" });
-    t.fail("enroll admin response status === 403 FAIL");
+    fail("enroll admin response status === 403 FAIL");
   } catch (out) {
-    t.ok(out, "error thrown for forbidden endpoint truthy OK");
-    t.ok(out.response, "enroll admin response truthy OK");
-    t.equal(
-      out.response.status,
-      StatusCodes.FORBIDDEN,
-      "enroll admin response status === 403 OK",
-    );
-    t.notok(out.response.data.data, "out.response.data.data falsy OK");
-    t.notok(out.response.data.success, "out.response.data.success falsy OK");
+    expect(out).toBeTruthy();
+    expect(out.response).toBeTruthy();
+    expect(out.response.status).toEqual(StatusCodes.FORBIDDEN);
+    expect(out.response.data.data).not.toBeTruthy();
+    expect(out.response.data.success).not.toBeTruthy();
   }
-
   t.end();
 });

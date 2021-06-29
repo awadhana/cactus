@@ -1,5 +1,5 @@
 import path from "path";
-import test, { Test } from "tape-promise/tape";
+import "jest-extended";
 import temp from "temp";
 import fs from "fs-extra";
 import { LogLevelDesc } from "@hyperledger/cactus-common";
@@ -9,31 +9,34 @@ import {
   RustcContainer,
 } from "../../../../main/typescript/public-api";
 
-const logLevel: LogLevelDesc = "TRACE";
-
 type HelloWorldExports = {
   hello_world: () => string;
   say_hello: (name: string) => string;
 };
 
-test("compiles Rust code to NodeJS targeted .wasm", async (t: Test) => {
+const logLevel: LogLevelDesc = "TRACE";
+
+let rustcContainer: RustcContainer;
+
+beforeAll(async () => {
+  rustcContainer = new RustcContainer({ logLevel });
+});
+
+afterAll(async () => await rustcContainer.stop());
+afterAll(async () => await temp.cleanup());
+
+test("compiles Rust code to NodeJS targeted .wasm", async () => {
   const tmpDirAffix = "cactus-test-tooling-rustc-container-test";
   temp.track();
-  test.onFinish(async () => await temp.cleanup());
   const hostSourceDir = await temp.mkdir(tmpDirAffix);
 
   const srcDir = path.join(hostSourceDir, "./src/");
   await fs.mkdir(srcDir);
 
-  const rustcContainer = new RustcContainer({ logLevel });
-  t.ok(rustcContainer, "RustcContainer instance truthy OK");
-
-  test.onFinish(async () => {
-    await rustcContainer.stop();
-  });
+  expect(rustcContainer).toBeTruthy();
 
   const dockerodeContainer = await rustcContainer.start();
-  t.ok(dockerodeContainer, "dockerodeContainer truthy OK");
+  expect(dockerodeContainer).toBeTruthy();
 
   const containerPkDir = path.join(rustcContainer.cwd, "./pkg/");
 
@@ -48,9 +51,9 @@ test("compiles Rust code to NodeJS targeted .wasm", async (t: Test) => {
     srcFileDir: cargoTomlHostDir,
     srcFileName: "Cargo.toml",
   });
-  t.ok(putCargoTomlRes, "putCargoTomlRes truthy OK");
-  t.ok(putCargoTomlRes.statusCode, "putCargoTomlRes.statusCode truthy OK");
-  t.equal(putCargoTomlRes.statusCode, 200, "putCargoTomlRes.statusCode 200 OK");
+  expect(putCargoTomlRes);
+  expect(putCargoTomlRes.statusCode);
+  expect(putCargoTomlRes.statusCode).toEqual(200);
 
   const containerSrcDir = path.join(rustcContainer.cwd, "./src/");
   await Containers.exec(dockerodeContainer, ["mkdir", containerSrcDir]);
@@ -66,15 +69,15 @@ test("compiles Rust code to NodeJS targeted .wasm", async (t: Test) => {
     srcFileDir: libRsHostDir,
     srcFileName: "lib.rs",
   });
-  t.ok(putLibRsRes, "putLibRsRes truthy OK");
-  t.ok(putLibRsRes.statusCode, "putLibRsRes.statusCode truthy OK");
-  t.equal(putLibRsRes.statusCode, 200, "putLibRsRes.statusCode 200 OK");
+  expect(putLibRsRes).toBeTruthy();
+  expect(putLibRsRes.statusCode).toBeTruthy();
+  expect(putLibRsRes.statusCode).toEqual(200);
 
   const wasmPackBuildOut = await Containers.exec(
     dockerodeContainer,
     RustcBuildCmd.WASM_PACK_BUILD_NODEJS,
   );
-  t.ok(wasmPackBuildOut, "wasmPackBuildOut truthy OK");
+  expect(wasmPackBuildOut).toBeTruthy();
 
   // The list of files the wasm-pack NodeJS target produces
   const expectedFiles = [
@@ -87,10 +90,9 @@ test("compiles Rust code to NodeJS targeted .wasm", async (t: Test) => {
   ];
 
   const filesOnFs = await Containers.ls(dockerodeContainer, containerPkDir);
-  t.ok(filesOnFs, "filesOnFs truthy OK");
-  t.true(Array.isArray(filesOnFs), "Array.isArray(filesOnFs) OK");
-  t.comment(`filesOnFs: ${JSON.stringify(filesOnFs)}`);
-  t.deepEqual(filesOnFs, expectedFiles, "deepEqual filesOnFs, fileNames OK");
+  expect(filesOnFs).toBeTruthy();
+  expect(Array.isArray(filesOnFs)).toBe(true);
+  expect(filesOnFs).toEqual(expectedFiles);
 
   const fileChecks = filesOnFs.map(async (fileName) => {
     const containerFilePath = path.join(containerPkDir, fileName);
@@ -99,26 +101,34 @@ test("compiles Rust code to NodeJS targeted .wasm", async (t: Test) => {
       dockerodeContainer,
       containerFilePath,
     );
-    t.ok(contentsBuffer, `contents buffer truthy OK: ${containerFilePath}`);
-    t.true(contentsBuffer.length > 0, `size > 0 OK: ${containerFilePath}`);
     await fs.writeFile(hostFilePath, contentsBuffer);
-    const { isFile, size } = await fs.stat(hostFilePath);
-    t.true(isFile, `isFile===true OK: ${hostFilePath}`);
-    t.true(size > 0, `size > 0 OK: ${hostFilePath}`);
+    const { size } = await fs.stat(hostFilePath);
+    return { contentsBuffer, size };
   });
 
-  await t.doesNotReject(Promise.all(fileChecks), "All WASM build files OK");
+  const fileChecksPromise = Promise.all(fileChecks);
+  expect(fileChecksPromise).toBeTruthy();
+  expect(fileChecksPromise).toResolve();
+
+  const fileChecksResults = await fileChecksPromise;
+  expect(fileChecksResults).toBeTruthy();
+  expect(fileChecksResults).toBeArrayOfSize(filesOnFs.length);
+
+  fileChecksResults.forEach(({ contentsBuffer, size }) => {
+    expect(contentsBuffer).toBeTruthy();
+    expect(contentsBuffer.length > 0).toBe(true);
+    // expect(isFile).toBe(true);
+    expect(size).toBeGreaterThan(0);
+  });
 
   const wasmHostPath = path.join(hostSourceDir, "./hello_world.js");
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const wasmModule = require(wasmHostPath) as HelloWorldExports;
   const helloWorldOut = wasmModule.hello_world();
-  t.ok(helloWorldOut, "helloWorldOut truthy OK");
-  t.equal(helloWorldOut, "Hello World!", "helloWorldOut EQ Hello World! OK");
+  expect(helloWorldOut).toBeTruthy();
+  expect(helloWorldOut).toEqual("Hello World!");
 
   const greeting = wasmModule.say_hello("Peter");
-  t.ok(greeting, "greeting truthy OK");
-  t.equal(greeting, "Hello Peter!", "greeting EQ Hello Peter! OK");
-
-  t.end();
+  expect(greeting).toBeTruthy();
+  expect(greeting).toEqual("Hello Peter!");
 });

@@ -1,10 +1,11 @@
 import { promisify } from "util";
 import { unlinkSync, readFileSync } from "fs";
+import "jest-extended";
+import test, { Test } from "tape-promise/tape";
 
 import { exec } from "child_process";
 import path from "path";
 
-import test, { Test } from "tape-promise/tape";
 import { v4 as uuidv4 } from "uuid";
 import { JWK } from "jose";
 
@@ -36,6 +37,7 @@ const artilleryScriptLocation =
 const logLevel: LogLevelDesc = "INFO";
 
 test("Start API server, and run Artillery benchmark test.", async (t: Test) => {
+  t.comment("I'm just here for the error of no t in the method");
   const keyPair = await JWK.generate("EC", "secp256k1", { use: "sig" }, true);
   const keyPairPem = keyPair.toPEM(true);
   const db: ConsortiumDatabase = {
@@ -107,7 +109,7 @@ test("Start API server, and run Artillery benchmark test.", async (t: Test) => {
     startResponse,
     "failed to start API server with dynamic plugin imports configured for it...",
   );
-  t.ok(startResponse, "startResponse truthy OK");
+  expect(startResponse).toBeTruthy();
 
   const addressInfoApi = (await startResponse).addressInfoApi;
   const protocol = apiServerOptions.apiTlsEnabled ? "https" : "http";
@@ -120,11 +122,11 @@ test("Start API server, and run Artillery benchmark test.", async (t: Test) => {
 
   const res = await apiClient.getPrometheusMetricsV1();
 
-  t.equal(res.status, 200);
+  expect(res.status).toEqual(200);
 
   // Sets apihost in process env variables to artillery script can read it.
   process.env.apiHost = apiHost;
-  await fireArtilleryCommand(t);
+  await fireArtilleryCommand();
 
   // Reading in Artillery JSON output
   let report = null;
@@ -140,11 +142,11 @@ test("Start API server, and run Artillery benchmark test.", async (t: Test) => {
   }
 
   if (report == null) {
-    t.fail("Test failed, cannot find Artillery report.");
+    fail("Test failed, cannot find Artillery report.");
   } else {
     const avgLatency = report.aggregate.latency.median;
     log.info(`Average Latency: ${avgLatency}`);
-    t.assert(avgLatency < 5, "Average latency should be less than 10");
+    expect(avgLatency < 5).toBeTruthy();
     // Removing report after processing.
     try {
       unlinkSync("./report.json");
@@ -154,12 +156,12 @@ test("Start API server, and run Artillery benchmark test.", async (t: Test) => {
   }
 });
 
-async function fireArtilleryCommand(t: Test) {
+async function fireArtilleryCommand() {
   try {
     const artilleryCommand = `artillery run ${artilleryScriptLocation} --output report.json`;
     await shell_exec(artilleryCommand);
   } catch (err) {
     log.error(`Failed to run artillery execution.`, err);
-    t.fail(`Test failed. Err: ${err}`);
+    fail(`Test failed. Err: ${err}`);
   }
 }

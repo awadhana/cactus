@@ -1,7 +1,5 @@
 import fs from "fs";
-
-import test, { Test } from "tape";
-
+import "jest-extended";
 import {
   ChainCodeCompiler,
   ICompilationOptions,
@@ -11,9 +9,9 @@ import { HELLO_WORLD_CONTRACT_GO_SOURCE } from "../fixtures/go/hello-world-contr
 
 // FIXME - the chain code compiler will undergo a refactor to make it work via
 // SSH/docker exec. Until then, leave this test out.
-test.skip("compiles chaincode straight from go source code", async (t: Test) => {
+test("compiles chaincode straight from go source code", async () => {
+  pending();
   const compiler = new ChainCodeCompiler({ logLevel: "TRACE" });
-
   const opts: ICompilationOptions = {
     fileName: "hello-world-contract.go",
     moduleName: "hello-world-contract",
@@ -25,11 +23,10 @@ test.skip("compiles chaincode straight from go source code", async (t: Test) => 
   };
 
   const result = await compiler.compile(opts);
-  t.ok(result, "result OK");
-  t.ok(result.binaryPath, "result.binaryPath OK");
-  t.ok(result.goVersionInfo, "result.goVersionInfo OK");
-  t.comment(result.goVersionInfo);
+  expect(result).toBeTruthy();
+  expect(result.binaryPath).toBeTruthy();
+  expect(result.goVersionInfo).toBeTruthy();
 
   const exists = fs.existsSync(result.binaryPath);
-  t.true(exists, `Binary exists at path ${result.binaryPath}`);
+  expect(exists).toBe(true);
 });

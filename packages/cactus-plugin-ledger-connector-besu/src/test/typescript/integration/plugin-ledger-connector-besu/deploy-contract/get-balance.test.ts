@@ -1,5 +1,7 @@
-import test, { Test } from "tape";
 import { v4 as uuidv4 } from "uuid";
+import "jest-extended";
+import test, { Test } from "tape-promise/tape";
+
 import { PluginRegistry } from "@hyperledger/cactus-core";
 import {
   PluginLedgerConnectorBesu,
@@ -14,6 +16,8 @@ import Web3 from "web3";
 import { PluginImportType } from "@hyperledger/cactus-core-api";
 
 test("can get balance of an account", async (t: Test) => {
+  t.comment("I'm just here for the error of no t in the method");
+
   const logLevel: LogLevelDesc = "TRACE";
   const besuTestLedger = new BesuTestLedger();
   await besuTestLedger.start();
@@ -63,9 +67,7 @@ test("can get balance of an account", async (t: Test) => {
 
   const req: GetBalanceV1Request = { address: firstHighNetWorthAccount };
   const currentBalance = await connector.getBalance(req);
-  t.comment(JSON.stringify(currentBalance));
   //makes the information in to string
-  t.ok(currentBalance, " Balance response is OK :-)");
-  t.equal(typeof currentBalance, "object", "Balance response type is OK :-)");
-  t.end();
+  expect(currentBalance).toBeTruthy();
+  expect(typeof currentBalance).toBe("object");
 });

@@ -1,8 +1,8 @@
 import http from "http";
 import type { AddressInfo } from "net";
-import test, { Test } from "tape-promise/tape";
 import { v4 as uuidv4 } from "uuid";
 import express from "express";
+import "jest-extended";
 import bodyParser from "body-parser";
 import {
   Configuration,
@@ -54,26 +54,31 @@ const web3SigningCredential: Web3SigningCredential = {
 
 const testCase = "Test get single status";
 
-test("BEFORE " + testCase, async (t: Test) => {
+test("BEFORE " + testCase, async () => {
   const pruning = pruneDockerAllIfGithubAction({ logLevel });
-  await t.doesNotReject(pruning, "Pruning did not throw OK");
-  t.end();
+  await expect(pruning).resolves.toBeTruthy();
+});
+const keychainId = uuidv4();
+const expressApp = express();
+expressApp.use(bodyParser.json({ limit: "250mb" }));
+let server: http.Server;
+
+beforeAll(async () => {
+  server = http.createServer(expressApp);
 });
 
-test(testCase, async (t: Test) => {
-  t.comment("Starting Besu Test Ledger");
+afterAll(async () => {
+  await besuTestLedger.stop();
+  await besuTestLedger.destroy();
+});
 
-  test.onFinish(async () => {
-    await besuTestLedger.stop();
-    await besuTestLedger.destroy();
-    await pruneDockerAllIfGithubAction({ logLevel });
-  });
+afterAll(async () => await Servers.shutdown(server));
 
+test(testCase, async () => {
   await besuTestLedger.start();
 
   const rpcApiHttpHost = await besuTestLedger.getRpcApiHttpHost();
   const rpcApiWsHost = await besuTestLedger.getRpcApiWsHost();
-  const keychainId = uuidv4();
   const keychainPlugin = new PluginKeychainMemory({
     instanceId: uuidv4(),
     keychainId,
@@ -119,8 +124,6 @@ test(testCase, async (t: Test) => {
   const pluginHtlc = await factoryHTLC.create(pluginOptions);
   pluginRegistry.add(pluginHtlc);
 
-  const expressApp = express();
-  expressApp.use(bodyParser.json({ limit: "250mb" }));
   const server = http.createServer(expressApp);
   const listenOptions: IListenOptions = {
     hostname: "0.0.0.0",
@@ -128,7 +131,6 @@ test(testCase, async (t: Test) => {
     server,
   };
   const addressInfo = (await Servers.listen(listenOptions)) as AddressInfo;
-  test.onFinish(async () => await Servers.shutdown(server));
   const { address, port } = addressInfo;
   const apiHost = `http://${address}:${port}`;
 
@@ -138,7 +140,6 @@ test(testCase, async (t: Test) => {
   await pluginHtlc.getOrCreateWebServices();
   await pluginHtlc.registerWebServices(expressApp);
 
-  t.comment("Deploys HashTimeLock via .json file on initialize function");
   const initRequest: InitializeRequest = {
     connectorId,
     keychainId,
@@ -148,19 +149,12 @@ test(testCase, async (t: Test) => {
   };
   const deployOut = await pluginHtlc.initialize(initRequest);
 
-  t.ok(deployOut, "pluginHtlc.initialize() output is truthy OK");
-  t.ok(
-    deployOut.transactionReceipt,
-    "pluginHtlc.initialize() output.transactionReceipt is truthy OK",
-  );
-  t.ok(
-    deployOut.transactionReceipt.contractAddress,
-    "pluginHtlc.initialize() output.transactionReceipt.contractAddress is truthy OK",
-  );
+  expect(deployOut).toBeTruthy();
+  expect(deployOut.transactionReceipt).toBeTruthy();
+  expect(deployOut.transactionReceipt.contractAddress).toBeTruthy();
   const hashTimeLockAddress = deployOut.transactionReceipt
     .contractAddress as string;
 
-  t.comment("Deploys TestToken via .json file on deployContract function");
   const deployOutToken = await connector.deployContract({
     contractName: TestTokenJSON.contractName,
     contractAbi: TestTokenJSON.abi,
@@ -170,19 +164,12 @@ test(testCase, async (t: Test) => {
     constructorArgs: ["100", "token", "2", "TKN"],
     gas: estimatedGas,
   });
-  t.ok(deployOutToken, "deployContract() output is truthy OK");
-  t.ok(
-    deployOutToken.transactionReceipt,
-    "deployContract() output.transactionReceipt is truthy OK",
-  );
-  t.ok(
-    deployOutToken.transactionReceipt.contractAddress,
-    "deployContract() output.transactionReceipt.contractAddress is truthy OK",
-  );
+  expect(deployOutToken).toBeTruthy();
+  expect(deployOutToken.transactionReceipt).toBeTruthy();
+  expect(deployOutToken.transactionReceipt.contractAddress).toBeTruthy();
   const tokenAddress = deployOutToken.transactionReceipt
     .contractAddress as string;
 
-  t.comment("Deploys DemoHelpers via .json file on deployContract function");
   const deployOutDemo = await connector.deployContract({
     contractName: DemoHelperJSON.contractName,
     contractAbi: DemoHelperJSON.abi,
@@ -192,17 +179,10 @@ test(testCase, async (t: Test) => {
     constructorArgs: [],
     gas: estimatedGas,
   });
-  t.ok(deployOutDemo, "deployContract() output is truthy OK");
-  t.ok(
-    deployOutDemo.transactionReceipt,
-    "deployContract() output.transactionReceipt is truthy OK",
-  );
-  t.ok(
-    deployOutDemo.transactionReceipt.contractAddress,
-    "deployContract() output.transactionReceipt.contractAddress is truthy OK",
-  );
+  expect(deployOutDemo).toBeTruthy();
+  expect(deployOutDemo.transactionReceipt).toBeTruthy();
+  expect(deployOutDemo.transactionReceipt.contractAddress).toBeTruthy();
 
-  t.comment("Approve 10 Tokens to HashTimeLockAddress");
   const { success } = await connector.invokeContract({
     contractName: TestTokenJSON.contractName,
     keychainId,
@@ -212,9 +192,8 @@ test(testCase, async (t: Test) => {
     params: [hashTimeLockAddress, "10"],
     gas: estimatedGas,
   });
-  t.equal(success, true, "approve() success is true OK");
+  expect(success).toBe(true);
 
-  t.comment("Get account balance");
   const responseBalance = await connector.invokeContract({
     contractName: TestTokenJSON.contractName,
     keychainId,
@@ -223,9 +202,8 @@ test(testCase, async (t: Test) => {
     methodName: "balanceOf",
     params: [firstHighNetWorthAccount],
   });
-  t.equal(responseBalance.callOutput, "100", "balance of account is 100 OK");
+  expect(responseBalance.callOutput).toEqual("100");
 
-  t.comment("Get HashTimeLock contract and account allowance");
   const responseAllowance = await connector.invokeContract({
     contractName: TestTokenJSON.contractName,
     keychainId,
@@ -234,9 +212,8 @@ test(testCase, async (t: Test) => {
     methodName: "allowance",
     params: [firstHighNetWorthAccount, hashTimeLockAddress],
   });
-  t.equal(responseAllowance.callOutput, "10", "callOutput() is 10 OK");
+  expect(responseAllowance.callOutput).toEqual("10");
 
-  t.comment("Create new contract for HTLC");
   const request: NewContractRequest = {
     contractAddress: hashTimeLockAddress,
     inputAmount: 10,
@@ -253,9 +230,8 @@ test(testCase, async (t: Test) => {
     gas: estimatedGas,
   };
   const resNewContract = await api.newContractV1(request);
-  t.equal(resNewContract.status, 200, "response status is OK");
+  expect(resNewContract.status).toEqual(200);
 
-  t.comment("Get single status of HTLC");
   const { callOutput } = await connector.invokeContract({
     contractName: DemoHelperJSON.contractName,
     keychainId,
@@ -278,7 +254,6 @@ test(testCase, async (t: Test) => {
     connectorId,
     keychainId,
   });
-  t.equal(res.status, 200, "response status is 200 OK");
-  t.equal(res.data, 1, "the contract status is 1 - Active");
-  t.end();
+  expect(res.status).toEqual(200);
+  expect(res.data).toEqual(1);
 });

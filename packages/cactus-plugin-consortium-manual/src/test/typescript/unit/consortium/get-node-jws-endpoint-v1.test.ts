@@ -1,5 +1,6 @@
-import test, { Test } from "tape";
 import { JWS, JWK } from "jose";
+import "jest-extended";
+import test, { Test } from "tape-promise/tape";
 import express from "express";
 import bodyParser from "body-parser";
 import http from "http";
@@ -27,7 +28,8 @@ import { DefaultApi as ConsortiumManualApi } from "../../../../main/typescript/p
 import { K_CACTUS_CONSORTIUM_MANUAL_TOTAL_NODE_COUNT } from "../../../../main/typescript/prometheus-exporter/metrics";
 
 test("Can provide JWS", async (t: Test) => {
-  t.ok(GetNodeJwsEndpoint);
+  t.comment("I'm just here for the error of no t in the method");
+  expect(GetNodeJwsEndpoint);
 
   const keyPair = await JWK.generate("EC", "secp256k1", { use: "sig" }, true);
   const keyPairPem = keyPair.toPEM(true);
@@ -65,9 +67,6 @@ test("Can provide JWS", async (t: Test) => {
   test.onFinish(async () => await Servers.shutdown(server));
   const { address, port } = addressInfo;
   const apiHost = `http://${address}:${port}`;
-  t.comment(
-    `Metrics URL: ${apiHost}/api/v1/plugins/@hyperledger/cactus-plugin-consortium-manual/get-prometheus-exporter-metrics`,
-  );
 
   const config = new Configuration({ basePath: apiHost });
   const apiClient = new ConsortiumManualApi(config);
@@ -78,20 +77,19 @@ test("Can provide JWS", async (t: Test) => {
   const pubKeyPem = keyPair.toPEM(false);
 
   const jws = await pluginConsortiumManual.getNodeJws();
-  t.ok(jws, "created JWS is truthy");
-  t.ok(typeof jws === "object", "created JWS is an object");
-
-  t.doesNotThrow(() => JWS.verify(jws, pubKeyPem), "JWS verified OK");
-  t.doesNotThrow(() => JWS.verify(jws, keyPair), "JWS verified OK");
+  expect(jws).toBeTruthy();
+  expect(typeof jws).toBe("object");
+  expect(() => JWS.verify(jws, pubKeyPem)).not.toThrow();
+  expect(() => JWS.verify(jws, keyPair)).not.toThrow();
 
   const payload = JWS.verify(jws, pubKeyPem) as {
     consortiumDatabase: ConsortiumDatabase;
   };
-  t.ok(payload, "JWS verified payload truthy");
+  expect(payload).toBeTruthy();
   if (typeof payload === "string") {
-    t.fail(`JWS Verification result: ${payload}`);
+    fail(`JWS Verification result: ${payload}`);
   } else {
-    t.ok(payload.consortiumDatabase, "JWS payload.consortiumDatabase truthy");
+    expect(payload.consortiumDatabase).toBeTruthy();
   }
 
   {
@@ -110,13 +108,10 @@ test("Can provide JWS", async (t: Test) => {
       '{type="' +
       K_CACTUS_CONSORTIUM_MANUAL_TOTAL_NODE_COUNT +
       '"} 0';
-    t.ok(res);
-    t.ok(res.data);
-    t.equal(res.status, 200);
-    t.true(
-      res.data.includes(promMetricsOutput),
-      "Total Cactus Node Count of 0 recorded as expected. RESULT OK",
-    );
+    expect(res);
+    expect(res.data);
+    expect(res.status).toEqual(200);
+    expect(res.data.includes(promMetricsOutput)).toBe(true);
   }
 
   // Creating a dummy cactus node for adding it to the cactus node array
@@ -152,14 +147,9 @@ test("Can provide JWS", async (t: Test) => {
       '{type="' +
       K_CACTUS_CONSORTIUM_MANUAL_TOTAL_NODE_COUNT +
       '"} 1';
-    t.ok(res);
-    t.ok(res.data);
-    t.equal(res.status, 200);
-    t.true(
-      res.data.includes(promMetricsOutput),
-      "Total Cactus Node Count of 1 recorded as expected. RESULT OK",
-    );
+    expect(res);
+    expect(res.data);
+    expect(res.status).toEqual(200);
+    expect(res.data.includes(promMetricsOutput)).toBeTruthy();
   }
-
-  t.end();
 });

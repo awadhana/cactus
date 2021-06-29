@@ -1,10 +1,9 @@
 import { AddressInfo } from "net";
-
-import test, { Test } from "tape-promise/tape";
 import { v4 as uuidV4 } from "uuid";
 import { JWK } from "jose";
 import Web3 from "web3";
-
+import "jest-extended";
+import test, { Test } from "tape-promise/tape";
 import { ApiClient } from "@hyperledger/cactus-api-client";
 import {
   ApiServer,
@@ -40,13 +39,12 @@ import {
 const logLevel: LogLevelDesc = "TRACE";
 const testCase = "Routes to correct node based on ledger ID";
 
-test("BEFORE " + testCase, async (t: Test) => {
+test("BEFORE " + testCase, async () => {
   const pruning = pruneDockerAllIfGithubAction({ logLevel });
-  await t.doesNotReject(pruning, "Pruning didn't throw OK");
-  t.end();
+  await expect(pruning).resolves.toBeTruthy();
 });
 
-test(testCase, async (t: Test) => {
+test(testCase, async () => {
   const ledger1: Ledger = {
     id: "my_cool_ledger_that_i_want_to_transact_on",
     ledgerType: LedgerType.Quorum2X,
@@ -131,13 +129,12 @@ test(testCase, async (t: Test) => {
   const config = new Configuration({ basePath: consortium.mainApiHost });
   const mainApiClient = new ApiClient(config);
 
-  test("Set Up Test ledgers, Consortium, Cactus Nodes", async (t2: Test) => {
+  test("Set Up Test ledgers, Consortium, Cactus Nodes", async (t: Test) => {
     const quorumTestLedger1 = new QuorumTestLedger();
     await quorumTestLedger1.start();
     test.onFinish(async () => {
       await quorumTestLedger1.stop();
       await quorumTestLedger1.destroy();
-      await pruneDockerAllIfGithubAction({ logLevel });
     });
     const rpcApiHttpHost1 = await quorumTestLedger1.getRpcApiHttpHost();
 
@@ -243,11 +240,10 @@ test(testCase, async (t: Test) => {
       await apiServer.start();
       test.onFinish(() => apiServer.shutdown());
     }
-
-    t2.end();
+    t.end();
   });
 
-  test("ApiClient #1 Routes based on Ledger ID #1", async (t2: Test) => {
+  test("ApiClient #1 Routes based on Ledger ID #1", async () => {
     const apiClient1 = await mainApiClient.ofLedger(ledger1.id, QuorumApi);
 
     // send money to the test account on ledger 1
@@ -264,14 +260,12 @@ test(testCase, async (t: Test) => {
       },
     });
 
-    t2.ok(res, "Test account #1 initial funds response OK");
-    t2.ok(res.status > 199, "Test account #1 initial funds status > 199 OK");
-    t2.ok(res.status < 300, "Test account #1 initial funds status < 300 OK");
-
-    t2.end();
+    expect(res).toBeTruthy();
+    expect(res.status > 199).toBe(true);
+    expect(res.status < 300).toBe(true);
   });
 
-  test("ApiClient #1 Routes based on Ledger ID #2", async (t2: Test) => {
+  test("ApiClient #1 Routes based on Ledger ID #2", async () => {
     const apiClient2 = await mainApiClient.ofLedger(ledger2.id, QuorumApi);
 
     // send money to the test account on ledger 1
@@ -288,12 +282,13 @@ test(testCase, async (t: Test) => {
       },
     });
 
-    t2.ok(res, "Test account #2 initial funds response OK");
-    t2.ok(res.status > 199, "Test account #2 initial funds status > 199 OK");
-    t2.ok(res.status < 300, "Test account #2 initial funds status < 300 OK");
-
-    t2.end();
+    expect(res).toBeTruthy();
+    expect(res.status > 199).toBe(true);
+    expect(res.status < 300).toBe(true);
   });
+});
 
-  t.end();
+test("AFTER " + testCase, async () => {
+  const pruning = pruneDockerAllIfGithubAction({ logLevel });
+  await expect(pruning).resolves.toBeTruthy();
 });

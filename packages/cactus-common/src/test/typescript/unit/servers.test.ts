@@ -1,8 +1,7 @@
 import { createServer } from "http";
 import { AddressInfo } from "net";
-
 import test, { Test } from "tape-promise/tape";
-
+import "jest-extended";
 import { Servers } from "../../../main/typescript/index";
 
 test("Servers", async (tParent: Test) => {
@@ -42,8 +41,6 @@ test("Servers", async (tParent: Test) => {
       );
       await Servers.shutdown(server);
     }
-
-    t.end();
   });
 
   test("Servers#startOnPreferredPort()", async (t: Test) => {
@@ -61,19 +58,12 @@ test("Servers", async (tParent: Test) => {
     await t.doesNotReject(async () => {
       const server = await Servers.startOnPreferredPort(prefPort, host);
       test.onFinish(() => server.close());
-      t.ok(server, "Server returned truthy OK");
+      expect(server);
       const addressInfo = server.address() as AddressInfo;
-      t.ok(addressInfo, "AddressInfo returned truthy OK");
-      t.ok(addressInfo.port, "AddressInfo.port returned truthy OK");
-      t.doesNotEqual(
-        addressInfo.port,
-        prefPort,
-        "Preferred and actually allocated ports are different, therefore fallback is considered successful OK",
-      );
+      expect(addressInfo).toBeTruthy();
+      expect(addressInfo.port).toBeTruthy();
+      expect(addressInfo.port).not.toEqual(prefPort);
     }, "Servers.startOnPreferredPort falls back without throwing OK");
-
-    t.end();
   });
-
   tParent.end();
 });

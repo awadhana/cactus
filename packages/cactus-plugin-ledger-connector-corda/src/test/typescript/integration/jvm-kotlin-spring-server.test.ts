@@ -1,5 +1,6 @@
-import test, { Test } from "tape-promise/tape";
 import { v4 as internalIpV4 } from "internal-ip";
+import "jest-extended";
+import test, { Test } from "tape-promise/tape";
 
 import {
   Containers,
@@ -29,19 +30,20 @@ test.onFailure(async () => {
   await Containers.logDiagnostics({ logLevel });
 });
 
-test("BEFORE " + testCase, async (t: Test) => {
+test("BEFORE " + testCase, async () => {
   const pruning = pruneDockerAllIfGithubAction({ logLevel });
-  await t.doesNotReject(pruning, "Pruning didn't throw OK");
-  t.end();
+  await expect(pruning).resolves.toBeTruthy();
 });
 
 test(testCase, async (t: Test) => {
+  t.comment("I'm just here for the error of no t in the method");
+
   const ledger = new CordaTestLedger({
     imageName: "ghcr.io/hyperledger/cactus-corda-4-6-all-in-one-obligation",
     imageVersion: "2021-03-19-feat-686",
     logLevel,
   });
-  t.ok(ledger, "CordaTestLedger instantaited OK");
+  expect(ledger).toBeTruthy();
 
   test.onFinish(async () => {
     await ledger.stop();
@@ -49,7 +51,7 @@ test(testCase, async (t: Test) => {
     await pruneDockerAllIfGithubAction({ logLevel });
   });
   const ledgerContainer = await ledger.start();
-  t.ok(ledgerContainer, "CordaTestLedger container truthy post-start() OK");
+  expect(ledgerContainer).toBeTruthy();
 
   await ledger.logDebugPorts();
   const partyARpcPort = await ledger.getRpcAPublicPort();
@@ -57,12 +59,10 @@ test(testCase, async (t: Test) => {
   const jarFiles = await ledger.pullCordappJars(
     SampleCordappEnum.ADVANCED_OBLIGATION,
   );
-  t.comment(`Fetched ${jarFiles.length} cordapp jars OK`);
 
   const internalIpOrUndefined = await internalIpV4();
-  t.ok(internalIpOrUndefined, "Determined LAN IPv4 address successfully OK");
+  expect(internalIpOrUndefined).toBeTruthy();
   const internalIp = internalIpOrUndefined as string;
-  t.comment(`Internal IP (based on default gateway): ${internalIp}`);
 
   const springAppConfig = {
     logging: {
@@ -81,7 +81,6 @@ test(testCase, async (t: Test) => {
   };
   const springApplicationJson = JSON.stringify(springAppConfig);
   const envVarSpringAppJson = `SPRING_APPLICATION_JSON=${springApplicationJson}`;
-  t.comment(envVarSpringAppJson);
 
   const connector = new CordaConnectorContainer({
     logLevel,
@@ -91,7 +90,7 @@ test(testCase, async (t: Test) => {
     // imageVersion: "latest",
     envVars: [envVarSpringAppJson],
   });
-  t.ok(CordaConnectorContainer, "CordaConnectorContainer instantiated OK");
+  expect(CordaConnectorContainer).toBeTruthy();
 
   test.onFinish(async () => {
     try {
@@ -102,7 +101,7 @@ test(testCase, async (t: Test) => {
   });
 
   const connectorContainer = await connector.start();
-  t.ok(connectorContainer, "CordaConnectorContainer started OK");
+  expect(connectorContainer);
 
   await connector.logDebugPorts();
   const apiUrl = await connector.getApiLocalhostUrl();
@@ -110,25 +109,22 @@ test(testCase, async (t: Test) => {
   const apiClient = new CordaApi(config);
 
   const flowsRes = await apiClient.listFlowsV1();
-  t.ok(flowsRes.status === 200, "flowsRes.status === 200 OK");
-  t.ok(flowsRes.data, "flowsRes.data truthy OK");
-  t.ok(flowsRes.data.flowNames, "flowsRes.data.flowNames truthy OK");
-  t.comment(`apiClient.listFlowsV1() => ${JSON.stringify(flowsRes.data)}`);
+  expect(flowsRes.status).toBe(200);
+  expect(flowsRes.data).toBeTruthy();
+  expect(flowsRes.data.flowNames).toBeTruthy();
 
   const diagRes = await apiClient.diagnoseNodeV1();
-  t.ok(diagRes.status === 200, "diagRes.status === 200 OK");
-  t.ok(diagRes.data, "diagRes.data truthy OK");
-  t.ok(diagRes.data.nodeDiagnosticInfo, "nodeDiagnosticInfo truthy OK");
+  expect(diagRes.status).toBe(200);
+  expect(diagRes.data).toBeTruthy();
+  expect(diagRes.data.nodeDiagnosticInfo).toBeTruthy();
   const ndi = diagRes.data.nodeDiagnosticInfo;
-  t.ok(ndi.cordapps, "ndi.cordapps truthy OK");
-  t.ok(Array.isArray(ndi.cordapps), "ndi.cordapps is Array truthy OK");
-  t.true((ndi.cordapps as []).length > 0, "ndi.cordapps non-empty true OK");
-  t.ok(ndi.vendor, "ndi.vendor truthy OK");
-  t.ok(ndi.version, "ndi.version truthy OK");
-  t.ok(ndi.revision, "ndi.revision truthy OK");
-  t.ok(ndi.platformVersion, "ndi.platformVersion truthy OK");
-
-  t.comment(`apiClient.diagnoseNodeV1() => ${JSON.stringify(diagRes.data)}`);
+  expect(ndi.cordapps).toBeTruthy();
+  expect(Array.isArray(ndi.cordapps)).toBeTruthy();
+  expect((ndi.cordapps as []).length > 0).toBe(true);
+  expect(ndi.vendor).toBeTruthy();
+  expect(ndi.version).toBeTruthy();
+  expect(ndi.revision).toBeTruthy();
+  expect(ndi.platformVersion).toBeTruthy();
 
   const cordappDeploymentConfigs: CordappDeploymentConfig[] = [];
   const depReq: DeployContractJarsV1Request = {
@@ -136,15 +132,11 @@ test(testCase, async (t: Test) => {
     cordappDeploymentConfigs,
   };
   const depRes = await apiClient.deployContractJarsV1(depReq);
-  t.ok(depRes, "Jar deployment response truthy OK");
-  t.equal(depRes.status, 200, "Jar deployment status code === 200 OK");
-  t.ok(depRes.data, "Jar deployment response body truthy OK");
-  t.ok(depRes.data.deployedJarFiles, "Jar deployment body deployedJarFiles OK");
-  t.equal(
-    depRes.data.deployedJarFiles.length,
-    jarFiles.length,
-    "Deployed jar file count equals count in request OK",
-  );
+  expect(depRes).toBeTruthy();
+  expect(depRes.status).toEqual(200);
+  expect(depRes.data).toBeTruthy();
+  expect(depRes.data.deployedJarFiles).toBeTruthy();
+  expect(depRes.data.deployedJarFiles.length).toEqual(jarFiles.length);
 
   const networkMapRes = await apiClient.networkMapV1();
   const partyA = networkMapRes.data.find((it) =>
@@ -397,8 +389,6 @@ test(testCase, async (t: Test) => {
   } as unknown) as InvokeContractV1Request;
 
   const res = await apiClient.invokeContractV1(req);
-  t.ok(res, "InvokeContractV1Request truthy OK");
-  t.equal(res.status, 200, "InvokeContractV1Request status code === 200 OK");
-
-  t.end();
+  expect(res).toBeTruthy();
+  expect(res.status).toEqual(200);
 });

@@ -1,6 +1,7 @@
-import test, { Test } from "tape-promise/tape";
 import Web3 from "web3";
 import { v4 as uuidV4 } from "uuid";
+import "jest-extended";
+import test, { Test } from "tape-promise/tape";
 import {
   QuorumTestLedger,
   IQuorumGenesisOptions,
@@ -44,10 +45,9 @@ const log: Logger = LoggerProvider.getOrCreate({
 
 const contractName = "HelloWorld";
 
-test("BEFORE " + testCase, async (t: Test) => {
+test("BEFORE " + testCase, async () => {
   const pruning = pruneDockerAllIfGithubAction({ logLevel });
-  await t.doesNotReject(pruning, "Pruning didn't throw OK");
-  t.end();
+  await expect(pruning).resolves.toBeTruthy();
 });
 
 test(testCase, async (t: Test) => {
@@ -57,7 +57,6 @@ test(testCase, async (t: Test) => {
   test.onFinish(async () => {
     await ledger.stop();
     await ledger.destroy();
-    await pruneDockerAllIfGithubAction({ logLevel });
   });
 
   // 2. Start the actual ledger
@@ -107,8 +106,8 @@ test(testCase, async (t: Test) => {
 
   // 5. Find a high net worth account in the genesis object of the quorum ledger
   const quorumGenesisOptions: IQuorumGenesisOptions = await ledger.getGenesisJsObject();
-  t.ok(quorumGenesisOptions);
-  t.ok(quorumGenesisOptions.alloc);
+  expect(quorumGenesisOptions);
+  expect(quorumGenesisOptions.alloc);
 
   const highNetWorthAccounts: string[] = Object.keys(
     quorumGenesisOptions.alloc,
@@ -147,11 +146,11 @@ test(testCase, async (t: Test) => {
   // 8. Deploy smart contract by issuing REST API call
   const res = await client.deployContractSolBytecodeV1(req);
 
-  t.ok(res, "Response for contract deployment is truthy");
-  t.ok(res.status > 199, "Response status code for contract deployment > 199");
-  t.ok(res.status < 300, "Response status code for contract deployment < 300");
+  expect(res).toBeTruthy();
+  expect(res.status > 199).toBe(true);
+  expect(res.status < 300).toBe(true);
 
-  test("Invoke contract via SDK ApiClient object", async (t2: Test) => {
+  test("Invoke contract via SDK ApiClient object", async () => {
     const web3 = new Web3(rpcApiHttpHost);
     const testEthAccount = web3.eth.accounts.create(uuidV4());
 
@@ -167,13 +166,13 @@ test(testCase, async (t: Test) => {
         value: 10e9,
       },
     });
-    t2.ok(res1, "Funds transfer HTTP response #1 via SDK OK");
-    t2.ok(res1.status > 199, "Response status for Funds transfer #1 > 199");
-    t2.ok(res1.status < 300, "Response status for Funds transfer #1 < 300");
+    expect(res1).toBeTruthy();
+    expect(res1.status > 199).toBe(true);
+    expect(res1.status < 300).toBe(true);
 
     const balance = await web3.eth.getBalance(testEthAccount.address);
-    t2.ok(balance, "Retrieved balance of test account OK");
-    t2.equals(parseInt(balance, 10), 10e9, "Balance of test account OK");
+    expect(balance).toBeTruthy();
+    expect(parseInt(balance, 10)).toEqual(10e9);
 
     const sayHelloRes = await client.invokeContractV1({
       contractName,
@@ -185,19 +184,13 @@ test(testCase, async (t: Test) => {
       },
       keychainId: kvStoragePlugin.getKeychainId(),
     });
-    t2.ok(sayHelloRes, "sayHello() response is truthy");
-    t2.ok(sayHelloRes.status > 199, "Status for sayHello() res > 199");
-    t2.ok(sayHelloRes.status < 300, "Status for sayHello() res < 300");
-    t2.ok(sayHelloRes.data, "sayHello() response.data is truthy");
-    t2.ok(sayHelloRes.data.callOutput, "sayHello() callOutput truthy OK");
-    t2.ok(
-      typeof sayHelloRes.data.callOutput === "string",
-      "sayHello() callOutput is string type OK",
-    );
-    t2.ok(
-      sayHelloRes.data.callOutput === "Hello World!",
-      `sayHello() callOutput is "Hello World!" OK`,
-    );
+    expect(sayHelloRes).toBeTruthy();
+    expect(sayHelloRes.status > 199).toBe(true);
+    expect(sayHelloRes.status < 300).toBe(true);
+    expect(sayHelloRes.data).toBeTruthy();
+    expect(sayHelloRes.data.callOutput).toBeTruthy();
+    expect(typeof sayHelloRes.data.callOutput).toBeString();
+    expect(sayHelloRes.data.callOutput).toBe("Hello World");
 
     const newName = `DrCactus${uuidV4()}`;
     const setName1Res = await client.invokeContractV1({
@@ -213,11 +206,11 @@ test(testCase, async (t: Test) => {
       },
       keychainId: kvStoragePlugin.getKeychainId(),
     });
-    t2.ok(setName1Res, "setName1Res truthy OK");
-    t2.ok(setName1Res, "setName1Res truthy OK");
-    t2.ok(setName1Res.status > 199, "Status for setName1Res > 199 OK");
-    t2.ok(setName1Res.status < 300, "Status for setName1Res < 300 OK");
-    t2.ok(setName1Res.data, "setName1Res.data is truthy OK");
+    expect(setName1Res).toBeTruthy();
+    expect(setName1Res).toBeTruthy();
+    expect(setName1Res.status > 199).toBe(true);
+    expect(setName1Res.status < 300).toBe(true);
+    expect(setName1Res.data).toBeTruthy();
 
     const getName1Res = await client.invokeContractV1({
       contractName,
@@ -232,17 +225,13 @@ test(testCase, async (t: Test) => {
       },
       keychainId: kvStoragePlugin.getKeychainId(),
     });
-    t2.ok(getName1Res, `getName1Res truthy OK`);
-    t2.true(getName1Res.status > 199, `getName1Res.status > 199 OK`);
-    t2.true(getName1Res.status < 300, `getName1Res.status < 300 OK`);
-    t2.ok(getName1Res.data, `getName1Res.data truthy OK`);
-    t2.ok(getName1Res.data.callOutput, `getName1Res.data.callOutput truthy OK`);
-    t2.equal(
-      typeof getName1Res.data.callOutput,
-      "string",
-      `getName1Res.data.callOutput typeof string OK`,
-    );
-    t2.equal(getName1Res.data.callOutput, newName, `getName1Res truthy OK`);
+    expect(getName1Res).toBeTruthy();
+    expect(getName1Res.status > 199).toBe(true);
+    expect(getName1Res.status < 300).toBe(true);
+    expect(getName1Res.data).toBeTruthy();
+    expect(getName1Res.data.callOutput).toBeTruthy();
+    expect(getName1Res.data.callOutput).toBeString();
+    expect(getName1Res.data.callOutput).toEqual(newName);
 
     const getName2Res = await client.invokeContractV1({
       contractName,
@@ -258,15 +247,16 @@ test(testCase, async (t: Test) => {
       keychainId: kvStoragePlugin.getKeychainId(),
     });
 
-    t2.ok(getName2Res, `getName2Res truthy OK`);
-    t2.true(getName2Res.status > 199, `getName2Res.status > 199 OK`);
-    t2.true(getName2Res.status < 300, `getName2Res.status < 300 OK`);
-    t2.ok(getName2Res.data, `getName2Res.data truthy OK`);
-    t2.notok(
-      getName2Res.data.callOutput,
-      `getName2Res.data.callOutput falsy OK`,
-    );
+    expect(getName2Res).toBeTruthy();
+    expect(getName2Res.status > 199).toBe(true);
+    expect(getName2Res.status < 300).toBe(true);
+    expect(getName2Res.data).toBeTruthy();
+    expect(getName2Res.data.callOutput).not.toBeTruthy();
   });
-
   t.end();
+});
+
+test("AFTER " + testCase, async () => {
+  const pruning = pruneDockerAllIfGithubAction({ logLevel });
+  await expect(pruning).resolves.toBeTruthy();
 });

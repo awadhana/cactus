@@ -1,6 +1,8 @@
-import test, { Test } from "tape";
 import { v4 as uuidv4 } from "uuid";
 import { PluginRegistry } from "@hyperledger/cactus-core";
+import "jest-extended";
+import test, { Test } from "tape-promise/tape";
+
 import {
   PluginLedgerConnectorBesu,
   PluginFactoryLedgerConnector,
@@ -16,6 +18,7 @@ import { PluginImportType } from "@hyperledger/cactus-core-api";
 import { GetTransactionV1Request } from "../../../../main/typescript/generated/openapi/typescript-axios/api";
 
 test("can get past logs of an account", async (t: Test) => {
+  t.comment("I'm just here for the error of no t in the method");
   const logLevel: LogLevelDesc = "TRACE";
   const besuTestLedger = new BesuTestLedger();
   await besuTestLedger.start();
@@ -91,12 +94,6 @@ test("can get past logs of an account", async (t: Test) => {
     transactionHash: transactionReceipt.transactionHash,
   };
   const response = await connector.getTransaction(req);
-  t.comment(JSON.stringify(response.transaction));
-  t.ok(response.transaction, "getTransaction response is OK :-)");
-  t.equal(
-    typeof response.transaction,
-    "object",
-    "getTransaction response type is OK :-)",
-  );
-  t.end();
+  expect(response.transaction).toBeTruthy();
+  expect(typeof response.transaction).toBe("object");
 });
