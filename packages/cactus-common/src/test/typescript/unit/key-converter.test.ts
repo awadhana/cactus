@@ -1,12 +1,10 @@
-import test, { Test } from "tape";
-
 import KeyEncoder from "key-encoder";
-
+import "jest-extended";
+import test, { Test } from "tape-promise/tape";
 import {
   JsObjectSigner,
   Secp256k1Keys,
 } from "../../../main/typescript/public-api";
-
 import {
   KeyConverter,
   KeyFormat,
@@ -55,8 +53,6 @@ test.skip("Test Public Raw key conversion", async (assert: Test) => {
     convertPemPublic,
     "Public Raw => PEM conversion successful",
   );
-
-  assert.end();
 });
 
 test.skip("Test Public Hex key conversion", async (assert: Test) => {
@@ -102,8 +98,6 @@ test.skip("Test Public Hex key conversion", async (assert: Test) => {
     convertPemPublic,
     "Public Hex => PEM conversion successful",
   );
-
-  assert.end();
 });
 
 test.skip("Test Public PEM key conversion", async (assert: Test) => {
@@ -149,8 +143,6 @@ test.skip("Test Public PEM key conversion", async (assert: Test) => {
     convertPemPublic,
     "Public PEM => PEM conversion successful",
   );
-
-  assert.end();
 });
 
 test.skip("Test Private Raw key conversion", async (assert: Test) => {
@@ -196,8 +188,6 @@ test.skip("Test Private Raw key conversion", async (assert: Test) => {
     convertPemPrivate,
     "Private Raw => PEM conversion successful",
   );
-
-  assert.end();
 });
 
 test.skip("Test Private Hex key conversion", async (assert: Test) => {
@@ -243,8 +233,6 @@ test.skip("Test Private Hex key conversion", async (assert: Test) => {
     convertPemPrivate,
     "Private Hex => PEM conversion successful",
   );
-
-  assert.end();
 });
 
 test.skip("Test Private PEM key conversion", async (assert: Test) => {
@@ -290,8 +278,6 @@ test.skip("Test Private PEM key conversion", async (assert: Test) => {
     convertPemPrivate,
     "Private PEM => PEM conversion successful",
   );
-
-  assert.end();
 });
 
 test.skip("Test invalid from key format", async (t: Test) => {
@@ -321,38 +307,29 @@ test.skip("Test invalid from key format", async (t: Test) => {
   t.throws(() => {
     keyConverter.privateKeyAs(keyPair.privateKey, KeyFormat.Raw, "abc" as any);
   }, "KeyConverter#privateKeyAs Invalid KeyFormat");
-
-  t.end();
 });
 
 test.skip("correct signatures after conversion whirlwind", async (t: Test) => {
   const keyConverter = new KeyConverter();
   const keyPair = Secp256k1Keys.generateKeyPairsBuffer();
 
-  t.comment(`keyPair.privateKey: ${keyPair.privateKey}`);
-
-  t.comment(`privateKey hex: ${keyPair.privateKey.toString("hex")}`);
-
   const privKeyPem = keyConverter.privateKeyAs(
     keyPair.privateKey,
     KeyFormat.Raw,
     KeyFormat.PEM,
   );
-  t.comment(`privKeyPem: ${privKeyPem}`);
 
   const privKeyHex = keyConverter.privateKeyAs(
     privKeyPem,
     KeyFormat.PEM,
     KeyFormat.Hex,
   );
-  t.comment(`privKeyHex: ${privKeyHex}`);
 
   const privKeyRaw = keyConverter.privateKeyAs(
     privKeyPem,
     KeyFormat.PEM,
     KeyFormat.Raw,
   );
-  t.comment(`privKeyBuffer: ${privKeyRaw}`);
   t.deepEquals(keyPair.privateKey, privKeyRaw, "privKey equals privKeyRaw");
 
   const privKeyPem2 = keyConverter.privateKeyAs(
@@ -360,14 +337,12 @@ test.skip("correct signatures after conversion whirlwind", async (t: Test) => {
     KeyFormat.Hex,
     KeyFormat.PEM,
   );
-  t.comment(`privKeyPem2: ${privKeyPem2}`);
 
   const privKeyPem3 = keyConverter.privateKeyAs(
     privKeyRaw,
     KeyFormat.Raw,
     KeyFormat.PEM,
   );
-  t.comment(`privKeyPem3: ${privKeyPem3}`);
 
   t.equal(privKeyPem, privKeyPem2, "privKeyPem equals privKeyPem2");
   t.equal(privKeyPem, privKeyPem3, "privKeyPem equals privKeyPem3");
@@ -402,22 +377,16 @@ test.skip("correct signatures after conversion whirlwind", async (t: Test) => {
   });
 
   const signature1 = signer1.sign(payload);
-  t.comment(`Signature 1: ${signature1}`);
 
   const signature2 = signer2.sign(payload);
-  t.comment(`Signature 2: ${signature2}`);
 
   const signature3 = signer3.sign(payload);
-  t.comment(`Signature 3: ${signature3}`);
 
   const signature4 = signer4.sign(payload);
-  t.comment(`Signature 4: ${signature4}`);
 
   t.deepEquals(signature1, signature2, "signature1 deep equals  signature2");
 
   t.deepEquals(signature2, signature3, "signature2 deep equals  signature3");
 
   t.deepEquals(signature1, signature4, "signature1 deep equals  signature4");
-
-  t.end();
 });

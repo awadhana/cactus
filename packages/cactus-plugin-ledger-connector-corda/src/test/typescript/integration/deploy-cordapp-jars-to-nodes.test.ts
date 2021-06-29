@@ -1,10 +1,11 @@
-import test, { Test } from "tape-promise/tape";
 import { v4 as internalIpV4 } from "internal-ip";
+import "jest-extended";
 import { v4 as uuidv4 } from "uuid";
 import http from "http";
 import bodyParser from "body-parser";
 import express from "express";
 import { AddressInfo } from "net";
+import test, { Test } from "tape-promise/tape";
 
 import { Containers, CordaTestLedger } from "@hyperledger/cactus-test-tooling";
 import {
@@ -36,6 +37,7 @@ import { K_CACTUS_CORDA_TOTAL_TX_COUNT } from "../../../main/typescript/promethe
 const logLevel: LogLevelDesc = "TRACE";
 
 test("Tests are passing on the JVM side", async (t: Test) => {
+  t.comment("I'm just here for the error of no t in the method");
   test.onFailure(async () => {
     await Containers.logDiagnostics({ logLevel });
   });
@@ -47,19 +49,17 @@ test("Tests are passing on the JVM side", async (t: Test) => {
     // imageVersion: "latest",
     logLevel,
   });
-  t.ok(ledger, "CordaTestLedger instantaited OK");
+  expect(ledger).toBeTruthy();
 
   test.onFinish(async () => {
     await ledger.stop();
     await ledger.destroy();
   });
   const ledgerContainer = await ledger.start();
-  t.ok(ledgerContainer, "CordaTestLedger container truthy post-start() OK");
+  expect(ledgerContainer).toBeTruthy();
 
   const corDappsDirPartyA = await ledger.getCorDappsDirPartyA();
   const corDappsDirPartyB = await ledger.getCorDappsDirPartyB();
-  t.comment(`corDappsDirPartyA=${corDappsDirPartyA}`);
-  t.comment(`corDappsDirPartyB=${corDappsDirPartyB}`);
 
   await ledger.logDebugPorts();
   const partyARpcPort = await ledger.getRpcAPublicPort();
@@ -68,12 +68,10 @@ test("Tests are passing on the JVM side", async (t: Test) => {
   const jarFiles = await ledger.pullCordappJars(
     SampleCordappEnum.BASIC_CORDAPP,
   );
-  t.comment(`Fetched ${jarFiles.length} cordapp jars OK`);
 
   const internalIpOrUndefined = await internalIpV4();
-  t.ok(internalIpOrUndefined, "Determined LAN IPv4 address successfully OK");
+  expect(internalIpOrUndefined).toBeTruthy();
   const internalIp = internalIpOrUndefined as string;
-  t.comment(`Internal IP (based on default gateway): ${internalIp}`);
 
   // TODO: parse the gradle build files to extract the credentials?
   const partyARpcUsername = "user1";
@@ -101,7 +99,6 @@ test("Tests are passing on the JVM side", async (t: Test) => {
   };
   const springApplicationJson = JSON.stringify(springAppConfig);
   const envVarSpringAppJson = `SPRING_APPLICATION_JSON=${springApplicationJson}`;
-  t.comment(envVarSpringAppJson);
 
   const connector = new CordaConnectorContainer({
     logLevel,
@@ -111,7 +108,7 @@ test("Tests are passing on the JVM side", async (t: Test) => {
     // imageVersion: "latest",
     envVars: [envVarSpringAppJson],
   });
-  t.ok(CordaConnectorContainer, "CordaConnectorContainer instantiated OK");
+  expect(CordaConnectorContainer).toBeTruthy();
 
   test.onFinish(async () => {
     try {
@@ -122,7 +119,7 @@ test("Tests are passing on the JVM side", async (t: Test) => {
   });
 
   const connectorContainer = await connector.start();
-  t.ok(connectorContainer, "CordaConnectorContainer started OK");
+  expect(connectorContainer).toBeTruthy();
 
   await connector.logDebugPorts();
   const apiUrl = await connector.getApiLocalhostUrl();
@@ -131,10 +128,9 @@ test("Tests are passing on the JVM side", async (t: Test) => {
   const apiClient = new CordaApi(config);
 
   const flowsRes1 = await apiClient.listFlowsV1();
-  t.ok(flowsRes1.status === 200, "flowsRes1.status === 200 OK");
-  t.ok(flowsRes1.data, "flowsRes1.data truthy OK");
-  t.ok(flowsRes1.data.flowNames, "flowsRes1.data.flowNames truthy OK");
-  t.comment(`apiClient.listFlowsV1() => ${JSON.stringify(flowsRes1.data)}`);
+  expect(flowsRes1.status).toBe(200);
+  expect(flowsRes1.data).toBeTruthy();
+  expect(flowsRes1.data.flowNames).toBeTruthy();
   const flowNamesPreDeploy = flowsRes1.data.flowNames;
 
   const sshConfig = await ledger.getSshConfig();
@@ -190,38 +186,28 @@ test("Tests are passing on the JVM side", async (t: Test) => {
     cordappDeploymentConfigs,
   };
   const depRes = await apiClient.deployContractJarsV1(depReq);
-  t.ok(depRes, "Jar deployment response truthy OK");
-  t.equal(depRes.status, 200, "Jar deployment status code === 200 OK");
-  t.ok(depRes.data, "Jar deployment response body truthy OK");
-  t.ok(depRes.data.deployedJarFiles, "Jar deployment body deployedJarFiles OK");
-  t.equal(
-    depRes.data.deployedJarFiles.length,
-    jarFiles.length,
-    "Deployed jar file count equals count in request OK",
-  );
+  expect(depRes).toBeTruthy();
+  expect(depRes.status).toEqual(200);
+  expect(depRes.data).toBeTruthy();
+  expect(depRes.data.deployedJarFiles).toBeTruthy();
+  expect(depRes.data.deployedJarFiles.length).toEqual(jarFiles.length);
 
   const flowsRes2 = await apiClient.listFlowsV1();
-  t.ok(flowsRes2.status === 200, "flowsRes2.status === 200 OK");
-  t.comment(`apiClient.listFlowsV1() => ${JSON.stringify(flowsRes2.data)}`);
-  t.ok(flowsRes2.data, "flowsRes2.data truthy OK");
-  t.ok(flowsRes2.data.flowNames, "flowsRes2.data.flowNames truthy OK");
+  expect(flowsRes2.status).toBe(200);
+  expect(flowsRes2.data).toBeTruthy();
+  expect(flowsRes2.data.flowNames).toBeTruthy();
   const flowNamesPostDeploy = flowsRes2.data.flowNames;
-  t.notDeepLooseEqual(
-    flowNamesPostDeploy,
-    flowNamesPreDeploy,
-    "New flows detected post Cordapp Jar deployment OK",
-  );
+  expect(flowNamesPostDeploy).not.toBe(flowNamesPreDeploy);
 
   // let's see if this makes a difference and if yes, then we know that the issue
   // is a race condition for sure
   // await new Promise((r) => setTimeout(r, 120000));
-  t.comment("Fetching network map for Corda network...");
   const networkMapRes = await apiClient.networkMapV1();
-  t.ok(networkMapRes, "networkMapRes truthy OK");
-  t.ok(networkMapRes.status, "networkMapRes.status truthy OK");
-  t.ok(networkMapRes.data, "networkMapRes.data truthy OK");
-  t.true(Array.isArray(networkMapRes.data), "networkMapRes.data isArray OK");
-  t.true(networkMapRes.data.length > 0, "networkMapRes.data not empty OK");
+  expect(networkMapRes).toBeTruthy();
+  expect(networkMapRes.status).toBeTruthy();
+  expect(networkMapRes.data).toBeTruthy();
+  expect(Array.isArray(networkMapRes.data)).toBe(true);
+  expect(networkMapRes.data.length > 0).toBe(true);
 
   // const partyA = networkMapRes.data.find((it) =>
   //   it.legalIdentities.some((it2) => it2.name.organisation === "ParticipantA"),
@@ -316,8 +302,8 @@ test("Tests are passing on the JVM side", async (t: Test) => {
   } as unknown) as InvokeContractV1Request;
 
   const res = await apiClient.invokeContractV1(req);
-  t.ok(res, "InvokeContractV1Request truthy OK");
-  t.equal(res.status, 200, "InvokeContractV1Request status code === 200 OK");
+  expect(res).toBeTruthy();
+  expect(res.status).toEqual(200);
 
   const pluginOptions: IPluginLedgerConnectorCordaOptions = {
     instanceId: uuidv4(),
@@ -339,9 +325,6 @@ test("Tests are passing on the JVM side", async (t: Test) => {
   test.onFinish(async () => await Servers.shutdown(server));
   const { address, port } = addressInfo;
   const apiHost = `http://${address}:${port}`;
-  t.comment(
-    `Metrics URL: ${apiHost}/api/v1/plugins/@hyperledger/cactus-plugin-ledger-connector-corda/get-prometheus-exporter-metrics`,
-  );
 
   const apiConfig = new Configuration({ basePath: apiHost });
   const apiClient1 = new CordaApi(apiConfig);
@@ -363,13 +346,10 @@ test("Tests are passing on the JVM side", async (t: Test) => {
       '{type="' +
       K_CACTUS_CORDA_TOTAL_TX_COUNT +
       '"} 1';
-    t.ok(promRes);
-    t.ok(promRes.data);
-    t.equal(promRes.status, 200);
-    t.true(
-      promRes.data.includes(promMetricsOutput),
-      "Total Transaction Count of 1 recorded as expected. RESULT OK",
-    );
+    expect(promRes);
+    expect(promRes.data);
+    expect(promRes.status).toEqual(200);
+    expect(promRes.data.includes(promMetricsOutput)).toBe(true);
 
     // Executing transaction to increment the Total transaction count metrics
     plugin.transact();
@@ -386,14 +366,9 @@ test("Tests are passing on the JVM side", async (t: Test) => {
       '{type="' +
       K_CACTUS_CORDA_TOTAL_TX_COUNT +
       '"} 2';
-    t.ok(promRes1);
-    t.ok(promRes1.data);
-    t.equal(promRes1.status, 200);
-    t.true(
-      promRes1.data.includes(promMetricsOutput1),
-      "Total Transaction Count of 2 recorded as expected. RESULT OK",
-    );
+    expect(promRes1);
+    expect(promRes1.data);
+    expect(promRes1.status).toEqual(200);
+    expect(promRes1.data.includes(promMetricsOutput1)).toBe(true);
   }
-
-  t.end();
 });

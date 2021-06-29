@@ -1,6 +1,8 @@
-import test, { Test } from "tape-promise/tape";
 import { v4 as uuidv4 } from "uuid";
 import { JWK } from "jose";
+import "jest-extended";
+import test, { Test } from "tape-promise/tape";
+
 import expressJwt from "express-jwt";
 import axios, { Method } from "axios";
 import { StatusCodes } from "http-status-codes";
@@ -36,7 +38,7 @@ test(testCase, async (t: Test) => {
       audience: uuidv4(),
       issuer: uuidv4(),
     };
-    t.ok(expressJwtOptions, "Express JWT config truthy OK");
+    expect(expressJwtOptions).toBeTruthy();
 
     const ep = new UnprotectedActionEndpoint({
       connector: {} as PluginLedgerConnectorStub,
@@ -81,7 +83,7 @@ test(testCase, async (t: Test) => {
       startResponse,
       "failed to start API server with dynamic plugin imports configured for it...",
     );
-    t.ok(startResponse, "startResponse truthy OK");
+    expect(startResponse).toBeTruthy();
 
     const addressInfoApi = (await startResponse).addressInfoApi;
     const protocol = apiSrvOpts.apiTlsEnabled ? "https" : "http";
@@ -98,30 +100,15 @@ test(testCase, async (t: Test) => {
       url: `${apiHost}${ep.getPath()}`,
       method: ep.getVerbLowerCase() as Method,
     });
-    t.ok(res1, "stub unprotected action response truthy OK");
-    t.equal(
-      res1.status,
-      StatusCodes.OK,
-      "stub unprotected action response status === 200 OK",
-    );
-    t.equal(typeof res1.data, "object", "typeof res1.data is 'object' OK");
-    t.ok(typeof res1.data.data, "res1.data.data truthy OK");
-    t.ok(
-      typeof res1.data.data.reqBodyrequestId,
-      "res1.data.data.reqBody truthy OK",
-    );
-    t.ok(
-      typeof res1.data.data.reqBody.requestId,
-      "res1.data.data.reqBody.requestId truthy OK",
-    );
-    t.equal(
-      res1.data.data.reqBody.requestId,
-      req1.requestId,
-      "res1.data.requestId === req1.requestId OK",
-    );
+    expect(res1).toBeTruthy();
+    expect(res1.status).toEqual(StatusCodes.OK);
+    expect(typeof res1.data).toBeTruthy();
+    expect(typeof res1.data.data).toBeTruthy();
+    expect(typeof res1.data.data.reqBodyrequestId).toBeTruthy();
+    expect(typeof res1.data.data.reqBody.requestId).toBeTruthy();
+    expect(res1.data.data.reqBody.requestId).toEqual(req1.requestId);
   } catch (ex) {
     log.error(ex);
-    t.fail("Exception thrown during test execution, see above for details!");
-    throw ex;
+    fail("Exception thrown during test execution, see above for details!");
   }
 });

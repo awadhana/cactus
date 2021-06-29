@@ -1,5 +1,7 @@
-import test, { Test } from "tape-promise/tape";
 import { v4 as uuidv4 } from "uuid";
+import "jest-extended";
+import test, { Test } from "tape-promise/tape";
+
 import { Server as SocketIoServer } from "socket.io";
 import { PluginRegistry } from "@hyperledger/cactus-core";
 import {
@@ -36,13 +38,13 @@ import { BesuApiClientOptions } from "../../../../../main/typescript/api-client/
 const testCase = "deploys contract via .json file";
 const logLevel: LogLevelDesc = "TRACE";
 
-test("BEFORE " + testCase, async (t: Test) => {
+test("BEFORE " + testCase, async () => {
   const pruning = pruneDockerAllIfGithubAction({ logLevel });
-  await t.doesNotReject(pruning, "Pruning didn't throw OK");
-  t.end();
+  await expect(pruning).resolves.toBeTruthy();
 });
 
 test(testCase, async (t: Test) => {
+  t.comment("I'm just here for the error of no t in the method");
   const besuTestLedger = new BesuTestLedger();
   await besuTestLedger.start();
 
@@ -114,12 +116,7 @@ test(testCase, async (t: Test) => {
   test.onFinish(async () => await Servers.shutdown(server));
   const { address, port } = addressInfo;
   const apiHost = `http://${address}:${port}`;
-  t.comment(
-    `Metrics URL: ${apiHost}/api/v1/plugins/@hyperledger/cactus-plugin-ledger-connector-besu/get-prometheus-exporter-metrics`,
-  );
-
-  const wsBasePath = apiHost + Constants.SocketIoConnectionPathV1;
-  t.comment("WS base path: " + wsBasePath);
+  // const wsBasePath = apiHost + Constants.SocketIoConnectionPathV1;
   const besuApiClientOptions = new BesuApiClientOptions({ basePath: apiHost });
   const apiClient = new BesuApiClient(besuApiClientOptions);
 
@@ -161,15 +158,15 @@ test(testCase, async (t: Test) => {
       resolve(res.blockHeader);
     });
   });
-  t.ok(aBlockHeader, "Web3BlockHeader truthy OK");
+  expect(aBlockHeader).toBeTruthy();
 
   const balance = await web3.eth.getBalance(testEthAccount.address);
-  t.ok(balance, "Retrieved balance of test account OK");
-  t.equals(parseInt(balance, 10), 10e9, "Balance of test account is OK");
+  expect(balance).toBeTruthy();
+  expect(parseInt(balance, 10)).toEqual(10e9);
 
   let contractAddress: string;
 
-  test("deploys contract via .json file", async (t2: Test) => {
+  test("deploys contract via .json file", async () => {
     const deployOut = await connector.deployContract({
       keychainId: keychainPlugin.getKeychainId(),
       contractName: HelloWorldContractJson.contractName,
@@ -183,21 +180,12 @@ test(testCase, async (t: Test) => {
       bytecode: HelloWorldContractJson.bytecode,
       gas: 1000000,
     });
-    t2.ok(deployOut, "deployContract() output is truthy OK");
-    t2.ok(
-      deployOut.transactionReceipt,
-      "deployContract() output.transactionReceipt is truthy OK",
-    );
-    t2.ok(
-      deployOut.transactionReceipt.contractAddress,
-      "deployContract() output.transactionReceipt.contractAddress is truthy OK",
-    );
+    expect(deployOut).toBeTruthy();
+    expect(deployOut.transactionReceipt).toBeTruthy();
+    expect(deployOut.transactionReceipt.contractAddress).toBeTruthy();
 
     contractAddress = deployOut.transactionReceipt.contractAddress as string;
-    t2.ok(
-      typeof contractAddress === "string",
-      "contractAddress typeof string OK",
-    );
+    expect(typeof contractAddress).toBeString();
 
     const { callOutput: helloMsg } = await connector.invokeContract({
       contractName: HelloWorldContractJson.contractName,
@@ -212,14 +200,11 @@ test(testCase, async (t: Test) => {
         type: Web3SigningCredentialType.PrivateKeyHex,
       },
     });
-    t2.ok(helloMsg, "sayHello() output is truthy");
-    t2.true(
-      typeof helloMsg === "string",
-      "sayHello() output is type of string",
-    );
+    expect(helloMsg).toBeTruthy();
+    expect(typeof helloMsg).toBeString();
   });
 
-  test("invoke Web3SigningCredentialType.NONE", async (t2: Test) => {
+  test("invoke Web3SigningCredentialType.NONE", async () => {
     const testEthAccount2 = web3.eth.accounts.create(uuidv4());
 
     const { rawTransaction } = await web3.eth.accounts.signTransaction(
@@ -247,12 +232,11 @@ test(testCase, async (t: Test) => {
     });
 
     const balance2 = await web3.eth.getBalance(testEthAccount2.address);
-    t2.ok(balance2, "Retrieved balance of test account 2 OK");
-    t2.equals(parseInt(balance2, 10), 10e6, "Balance of test account2 is OK");
-    t2.end();
+    expect(balance2).toBeTruthy();
+    expect(parseInt(balance2, 10)).toEqual(10e6);
   });
 
-  test("invoke Web3SigningCredentialType.PrivateKeyHex", async (t2: Test) => {
+  test("invoke Web3SigningCredentialType.PrivateKeyHex", async () => {
     const newName = `DrCactus${uuidv4()}`;
     const setNameOut = await connector.invokeContract({
       contractName: HelloWorldContractJson.contractName,
@@ -268,10 +252,10 @@ test(testCase, async (t: Test) => {
       },
       nonce: 1,
     });
-    t2.ok(setNameOut, "setName() invocation #1 output is truthy OK");
+    expect(setNameOut).toBeTruthy();
 
     try {
-      const setNameOutInvalid = await connector.invokeContract({
+      await connector.invokeContract({
         contractName: HelloWorldContractJson.contractName,
         contractAbi: HelloWorldContractJson.abi,
         contractAddress,
@@ -286,13 +270,9 @@ test(testCase, async (t: Test) => {
         },
         nonce: 1,
       });
-      t2.ifError(setNameOutInvalid);
+      fail("Invalid request with bad nonce. Succeed but it shouldn't have");
     } catch (error) {
-      t2.notStrictEqual(
-        error,
-        "Nonce too low",
-        "setName() invocation with invalid nonce",
-      );
+      expect(error).not.toBe("Nonce too low");
     }
     const { callOutput: getNameOut } = await connector.invokeContract({
       contractName: HelloWorldContractJson.contractName,
@@ -308,7 +288,7 @@ test(testCase, async (t: Test) => {
         type: Web3SigningCredentialType.PrivateKeyHex,
       },
     });
-    t2.equal(getNameOut, newName, `getName() output reflects the update OK`);
+    expect(getNameOut).toEqual(newName);
 
     const getNameOut2 = await connector.invokeContract({
       contractName: HelloWorldContractJson.contractName,
@@ -324,7 +304,7 @@ test(testCase, async (t: Test) => {
         type: Web3SigningCredentialType.PrivateKeyHex,
       },
     });
-    t2.ok(getNameOut2, "getName() invocation #2 output is truthy OK");
+    expect(getNameOut2).toBeTruthy();
 
     const response = await connector.invokeContract({
       contractName: HelloWorldContractJson.contractName,
@@ -341,7 +321,7 @@ test(testCase, async (t: Test) => {
       },
       value: 10,
     });
-    t2.ok(response, "deposit() payable invocation output is truthy OK");
+    expect(response).toBeTruthy();
 
     const { callOutput } = await connector.invokeContract({
       contractName: HelloWorldContractJson.contractName,
@@ -357,16 +337,10 @@ test(testCase, async (t: Test) => {
         type: Web3SigningCredentialType.PrivateKeyHex,
       },
     });
-    t2.equal(
-      callOutput,
-      newName,
-      `getNameByIndex() output reflects the update OK`,
-    );
-
-    t2.end();
+    expect(callOutput).toEqual(newName);
   });
 
-  test("invoke Web3SigningCredentialType.CactusKeychainRef", async (t2: Test) => {
+  test("invoke Web3SigningCredentialType.CactusKeychainRef", async () => {
     const newName = `DrCactus${uuidv4()}`;
 
     const signingCredential: Web3SigningCredentialCactusKeychainRef = {
@@ -387,10 +361,10 @@ test(testCase, async (t: Test) => {
       signingCredential,
       nonce: 4,
     });
-    t2.ok(setNameOut, "setName() invocation #1 output is truthy OK");
+    expect(setNameOut).toBeTruthy();
 
     try {
-      const setNameOutInvalid = await connector.invokeContract({
+      await connector.invokeContract({
         contractName: HelloWorldContractJson.contractName,
         contractAbi: HelloWorldContractJson.abi,
         contractAddress,
@@ -401,13 +375,9 @@ test(testCase, async (t: Test) => {
         signingCredential,
         nonce: 4,
       });
-      t2.ifError(setNameOutInvalid);
+      fail("Invalid request with bad nonce. Succeed but it shouldn't have");
     } catch (error) {
-      t2.notStrictEqual(
-        error,
-        "Nonce too low",
-        "setName() invocation with invalid nonce",
-      );
+      expect(error).not.toBe("Nonce too low");
     }
 
     const { callOutput: getNameOut } = await connector.invokeContract({
@@ -420,7 +390,7 @@ test(testCase, async (t: Test) => {
       gas: 1000000,
       signingCredential,
     });
-    t2.equal(getNameOut, newName, `getName() output reflects the update OK`);
+    expect(getNameOut).toEqual(newName);
 
     const getNameOut2 = await connector.invokeContract({
       contractName: HelloWorldContractJson.contractName,
@@ -432,7 +402,7 @@ test(testCase, async (t: Test) => {
       gas: 1000000,
       signingCredential,
     });
-    t2.ok(getNameOut2, "getName() invocation #2 output is truthy OK");
+    expect(getNameOut2).toBeTruthy();
 
     const response = await connector.invokeContract({
       contractName: HelloWorldContractJson.contractName,
@@ -445,7 +415,7 @@ test(testCase, async (t: Test) => {
       signingCredential,
       value: 10,
     });
-    t2.ok(response, "deposit() payable invocation output is truthy OK");
+    expect(response).toBeTruthy();
 
     const { callOutput } = await connector.invokeContract({
       contractName: HelloWorldContractJson.contractName,
@@ -457,16 +427,10 @@ test(testCase, async (t: Test) => {
       gas: 1000000,
       signingCredential,
     });
-    t2.equal(
-      callOutput,
-      newName,
-      `getNameByIndex() output reflects the update OK`,
-    );
-
-    t2.end();
+    expect(callOutput).toEqual(newName);
   });
 
-  test("get prometheus exporter metrics", async (t2: Test) => {
+  test("get prometheus exporter metrics", async () => {
     const res = await apiClient.getPrometheusMetricsV1();
     const promMetricsOutput =
       "# HELP " +
@@ -479,15 +443,9 @@ test(testCase, async (t: Test) => {
       '{type="' +
       K_CACTUS_BESU_TOTAL_TX_COUNT +
       '"} 9';
-    t2.ok(res, "Response truthy OK");
-    t2.ok(res.data);
-    t2.equal(res.status, 200);
-    t2.true(
-      res.data.includes(promMetricsOutput),
-      "Total Transaction Count equals 9 OK.",
-    );
-    t2.end();
+    expect(res).toBeTruthy();
+    expect(res.data).toBeTruthy();
+    expect(res.status).toEqual(200);
+    expect(res.data.includes(promMetricsOutput)).toBe(true);
   });
-
-  t.end();
 });

@@ -1,7 +1,8 @@
 import http from "http";
 import { AddressInfo } from "net";
-
+import "jest-extended";
 import test, { Test } from "tape-promise/tape";
+
 import { v4 as uuidv4 } from "uuid";
 
 import bodyParser from "body-parser";
@@ -48,13 +49,13 @@ import { Configuration } from "@hyperledger/cactus-core-api";
 const testCase = "runs tx on a Fabric v2.2.0 ledger";
 const logLevel: LogLevelDesc = "TRACE";
 
-test("BEFORE " + testCase, async (t: Test) => {
+test("BEFORE " + testCase, async () => {
   const pruning = pruneDockerAllIfGithubAction({ logLevel });
-  await t.doesNotReject(pruning, "Pruning didn't throw OK");
-  t.end();
+  await expect(pruning).resolves.toBeTruthy();
 });
 
 test(testCase, async (t: Test) => {
+  t.comment("I'm just here for the error of no t in the method");
   const logLevel: LogLevelDesc = "TRACE";
   const level = "INFO";
   const label = "fabric run transaction test";
@@ -75,7 +76,7 @@ test(testCase, async (t: Test) => {
       ["CA_VERSION", "1.4.9"],
     ]),
   });
-  t.ok(ledger, "ledger (FabricTestLedgerV1) truthy OK");
+  expect(ledger).toBeTruthy();
 
   const tearDownLedger = async () => {
     await ledger.stop();
@@ -145,9 +146,6 @@ test(testCase, async (t: Test) => {
   test.onFinish(async () => await Servers.shutdown(server));
   const { address, port } = addressInfo;
   const apiHost = `http://${address}:${port}`;
-  t.comment(
-    `Metrics URL: ${apiHost}/api/v1/plugins/@hyperledger/cactus-plugin-ledger-connector-fabric/get-prometheus-exporter-metrics`,
-  );
 
   const apiConfig = new Configuration({ basePath: apiHost });
   const apiClient = new FabricApi(apiConfig);
@@ -173,10 +171,10 @@ test(testCase, async (t: Test) => {
       methodName: "GetAllAssets",
       params: [],
     } as RunTransactionRequest);
-    t.ok(res);
-    t.ok(res.data);
-    t.equal(res.status, 200);
-    t.doesNotThrow(() => JSON.parse(res.data.functionOutput));
+    expect(res).toBeTruthy();
+    expect(res.data).toBeTruthy();
+    expect(res.status).toEqual(200);
+    expect(() => JSON.parse(res.data.functionOutput)).not.toThrow();
   }
   {
     const req: RunTransactionRequest = {
@@ -189,10 +187,11 @@ test(testCase, async (t: Test) => {
     };
 
     const res = await apiClient.runTransactionV1(req);
-    t.ok(res);
-    t.ok(res.data);
-    t.ok(res.data.transactionId);
-    t.equal(res.status, 200);
+    expect(res.data.transactionId).toBeTruthy();
+    expect(res).toBeTruthy();
+    expect(res.data).toBeTruthy();
+    expect(res.status).toEqual(200);
+
     const res2 = await apiClient.getTransactionReceiptByTxIDV1({
       signingCredential,
       channelName,
@@ -201,7 +200,8 @@ test(testCase, async (t: Test) => {
       methodName: "GetBlockByTxID",
       params: [channelName, res.data.transactionId],
     } as RunTransactionRequest);
-    t.ok(res2);
+
+    expect(res2).toBeTruthy();
     log.info(res2.data);
   }
 
@@ -214,14 +214,14 @@ test(testCase, async (t: Test) => {
       methodName: "GetAllAssets",
       params: [],
     } as RunTransactionRequest);
-    t.ok(res);
-    t.ok(res.data);
-    t.equal(res.status, 200);
+    expect(res).toBeTruthy();
+    expect(res.data).toBeTruthy();
+    expect(res.status).toEqual(200);
     const assets = JSON.parse(res.data.functionOutput);
     const asset277 = assets.find((c: { ID: string }) => c.ID === assetId);
-    t.ok(asset277, "Located Asset record by its ID OK");
-    t.ok(asset277.owner, `Asset object has "owner" property OK`);
-    t.equal(asset277.owner, assetOwner, `Asset has expected owner OK`);
+    expect(asset277).toBeTruthy();
+    expect(asset277.owner).toBeTruthy();
+    expect(asset277.owner).toEqual(assetOwner);
   }
 
   {
@@ -237,15 +237,10 @@ test(testCase, async (t: Test) => {
       '{type="' +
       K_CACTUS_FABRIC_TOTAL_TX_COUNT +
       '"} 3';
-    t.comment(promMetricsOutput);
-    t.ok(res);
-    t.ok(res.data);
-    t.comment(res.data);
-    t.equal(res.status, 200);
-    t.true(
-      res.data.includes(promMetricsOutput),
-      "Total Transaction Count of 4 recorded as expected. RESULT OK",
-    );
+    expect(res).toBeTruthy();
+    expect(res.data).toBeTruthy();
+    expect(res.status).toEqual(200);
+    expect(res.data.includes(promMetricsOutput)).toBeTrue();
   }
 
   {
@@ -266,9 +261,9 @@ test(testCase, async (t: Test) => {
     };
 
     const res = await apiClient.runTransactionV1(req);
-    t.ok(res, "Create green asset response truthy OK");
-    t.ok(res.data, "Create green asset response.data truthy OK");
-    t.equal(res.status, 200, "Create green asset response.status=200 OK");
+    expect(res).toBeTruthy();
+    expect(res.data).toBeTruthy();
+    expect(res.status).toEqual(200);
   }
 
   {
@@ -293,15 +288,13 @@ test(testCase, async (t: Test) => {
       methodName: "GetAllAssets",
       params: [],
     } as RunTransactionRequest);
-    t.ok(res);
-    t.ok(res.data);
-    t.equal(res.status, 200);
+    expect(res).toBeTruthy();
+    expect(res.data).toBeTruthy();
+    expect(res.status).toEqual(200);
     const assets = JSON.parse(res.data.functionOutput);
     const asset277 = assets.find((c: { ID: string }) => c.ID === assetId);
-    t.ok(asset277, "Located Asset record by its ID OK");
-    t.ok(asset277.owner, `Asset object has "owner" property OK`);
-    t.equal(asset277.owner, assetOwner, `Asset has expected owner OK`);
+    expect(asset277).toBeTruthy();
+    expect(asset277.owner).toBeTruthy();
+    expect(asset277.owner).toEqual(assetOwner);
   }
-
-  t.end();
 });

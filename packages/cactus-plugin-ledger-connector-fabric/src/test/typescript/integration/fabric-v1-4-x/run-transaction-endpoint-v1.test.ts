@@ -1,7 +1,8 @@
 import http from "http";
 import { AddressInfo } from "net";
+import "jest-extended";
+import test from "tape-promise/tape";
 
-import test, { Test } from "tape-promise/tape";
 import { v4 as uuidv4 } from "uuid";
 
 import bodyParser from "body-parser";
@@ -50,13 +51,12 @@ test.onFailure(async () => {
   await Containers.logDiagnostics({ logLevel });
 });
 
-test("BEFORE " + testCase, async (t: Test) => {
+test("BEFORE " + testCase, async () => {
   const pruning = pruneDockerAllIfGithubAction({ logLevel });
-  await t.doesNotReject(pruning, "Pruning didn't throw OK");
-  t.end();
+  await expect(pruning).resolves.toBeTruthy();
 });
 
-test.skip(testCase, async (t: Test) => {
+test.skip(testCase, async () => {
   const ledger = new FabricTestLedgerV1({
     publishAllPorts: true,
     emitContainerLogs: true,
@@ -136,9 +136,6 @@ test.skip(testCase, async (t: Test) => {
   test.onFinish(async () => await Servers.shutdown(server));
   const { address, port } = addressInfo;
   const apiHost = `http://${address}:${port}`;
-  t.comment(
-    `Metrics URL: ${apiHost}/api/v1/plugins/@hyperledger/cactus-plugin-ledger-connector-fabric/get-prometheus-exporter-metrics`,
-  );
 
   const apiConfig = new Configuration({ basePath: apiHost });
   const apiClient = new FabricApi(apiConfig);
@@ -162,10 +159,10 @@ test.skip(testCase, async (t: Test) => {
       methodName: "queryAllCars",
       params: [],
     } as RunTransactionRequest);
-    t.ok(res);
-    t.ok(res.data);
-    t.equal(res.status, 200);
-    t.doesNotThrow(() => JSON.parse(res.data.functionOutput));
+    expect(res).toBeTruthy();
+    expect(res.data).toBeTruthy();
+    expect(res.status).toEqual(200);
+    expect(() => JSON.parse(res.data.functionOutput)).not.toThrow();
   }
 
   {
@@ -179,9 +176,9 @@ test.skip(testCase, async (t: Test) => {
     };
 
     const res = await apiClient.runTransactionV1(req);
-    t.ok(res);
-    t.ok(res.data);
-    t.equal(res.status, 200);
+    expect(res).toBeTruthy();
+    expect(res.data).toBeTruthy();
+    expect(res.status).toEqual(200);
   }
   {
     const res = await apiClient.runTransactionV1({
@@ -192,15 +189,15 @@ test.skip(testCase, async (t: Test) => {
       methodName: "queryAllCars",
       params: [],
     } as RunTransactionRequest);
-    t.ok(res);
-    t.ok(res.data);
-    t.equal(res.status, 200);
+    expect(res).toBeTruthy();
+    expect(res.data).toBeTruthy();
+    expect(res.status).toEqual(200);
     const cars = JSON.parse(res.data.functionOutput);
     const car277 = cars.find((c: { Key: string }) => c.Key === carId);
-    t.ok(car277, "Located Car record by its ID OK");
-    t.ok(car277.Record, `Car object has "Record" property OK`);
-    t.ok(car277.Record.owner, `Car object has "Record"."owner" property OK`);
-    t.equal(car277.Record.owner, carOwner, `Car has expected owner OK`);
+    expect(car277).toBeTruthy();
+    expect(car277.Record).toBeTruthy();
+    expect(car277.Record.owner).toBeTruthy();
+    expect(car277.Record.owner).toEqual(carOwner);
   }
   {
     const res = await apiClient.getPrometheusMetricsV1();
@@ -215,13 +212,9 @@ test.skip(testCase, async (t: Test) => {
       '{type="' +
       K_CACTUS_FABRIC_TOTAL_TX_COUNT +
       '"} 3';
-    t.ok(res);
-    t.ok(res.data);
-    t.equal(res.status, 200);
-    t.true(
-      res.data.includes(promMetricsOutput),
-      "Total Transaction Count of 3 recorded as expected. RESULT OK",
-    );
+    expect(res).toBeTruthy();
+    expect(res.data).toBeTruthy();
+    expect(res.status).toEqual(200);
+    expect(res.data.includes(promMetricsOutput)).toBeTruthy();
   }
-  t.end();
 });

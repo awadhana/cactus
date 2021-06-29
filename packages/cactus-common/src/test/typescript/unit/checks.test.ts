@@ -1,42 +1,56 @@
-import test, { Test } from "tape";
-
+import "jest-extended";
+import test, { Test } from "tape-promise/tape";
 import { v4 as uuidv4 } from "uuid";
 
 import { Checks } from "../../../main/typescript";
 
-test("Checks", (tParent: Test) => {
+test("Checks", () => {
   test("Checks#nonBlankString()", (t: Test) => {
     const subject = uuidv4();
     const pattern = new RegExp(`${subject}`);
 
-    t.throws(() => Checks.nonBlankString("", subject), pattern);
-    t.throws(() => Checks.nonBlankString(" ", subject), pattern);
-    t.throws(() => Checks.nonBlankString("\n", subject), pattern);
-    t.throws(() => Checks.nonBlankString("\t", subject), pattern);
-    t.throws(() => Checks.nonBlankString("\t\n", subject), pattern);
-    t.throws(() => Checks.nonBlankString("\n\r", subject), pattern);
+    expect(() => Checks.nonBlankString("", subject)).toThrowWithMessage(
+      TypeError,
+      pattern,
+    );
+    expect(() => Checks.nonBlankString(" ", subject)).toThrowWithMessage(
+      TypeError,
+      pattern,
+    );
+    expect(() => Checks.nonBlankString("\n", subject)).toThrowWithMessage(
+      TypeError,
+      pattern,
+    );
+    expect(() => Checks.nonBlankString("\t", subject)).toThrowWithMessage(
+      TypeError,
+      pattern,
+    );
+    expect(() => Checks.nonBlankString("\t\n", subject)).toThrowWithMessage(
+      TypeError,
+      pattern,
+    );
+    expect(() => Checks.nonBlankString("\n\r", subject)).toThrowWithMessage(
+      TypeError,
+      pattern,
+    );
 
-    t.doesNotThrow(() => Checks.nonBlankString("-"));
-    t.doesNotThrow(() => Checks.nonBlankString(" a "));
-    t.doesNotThrow(() => Checks.nonBlankString("\na\t"));
-
+    expect(() => Checks.nonBlankString("-")).not.toThrow();
+    expect(() => Checks.nonBlankString(" a ")).not.toThrow();
+    expect(() => Checks.nonBlankString("\na\t")).not.toThrow();
     t.end();
   });
 
   test("#truthy()", (t: Test) => {
-    t.throws(() => Checks.truthy(false));
-    t.throws(() => Checks.truthy(NaN));
-    t.throws(() => Checks.truthy(null));
-    t.throws(() => Checks.truthy(undefined));
-    t.throws(() => Checks.truthy(0));
-    t.throws(() => Checks.truthy(""));
+    expect(() => Checks.truthy(false)).toThrow();
+    expect(() => Checks.truthy(NaN)).toThrow();
+    expect(() => Checks.truthy(null)).toThrow();
+    expect(() => Checks.truthy(undefined)).toThrow();
+    expect(() => Checks.truthy(0)).toThrow();
+    expect(() => Checks.truthy("")).toThrow();
 
-    t.doesNotThrow(() => Checks.truthy({}));
-    t.doesNotThrow(() => Checks.truthy([]));
-    t.doesNotThrow(() => Checks.truthy("OK"));
-
+    expect(() => Checks.truthy({})).not.toThrow();
+    expect(() => Checks.truthy([])).not.toThrow();
+    expect(() => Checks.truthy("OK")).not.toThrow();
     t.end();
   });
-
-  tParent.end();
 });

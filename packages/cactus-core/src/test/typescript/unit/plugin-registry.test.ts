@@ -1,11 +1,11 @@
-import test, { Test } from "tape";
 import { v4 as uuidv4 } from "uuid";
+import "jest-extended";
 
 import { PluginRegistry } from "../../../main/typescript/public-api";
 
 import { ICactusPlugin, IPluginKeychain } from "@hyperledger/cactus-core-api";
 
-test("PluginRegistry", (tMain: Test) => {
+test("PluginRegistry", () => {
   const keychainId = uuidv4();
   const instanceId = uuidv4();
 
@@ -46,63 +46,30 @@ test("PluginRegistry", (tMain: Test) => {
     ],
   });
 
-  test("findOneByKeychainId() finds plugin by keychain ID", (t: Test) => {
-    t.doesNotThrow(() => pluginRegistry.findOneByKeychainId(keychainId));
+  test("findOneByKeychainId() finds plugin by keychain ID", () => {
+    expect(() => pluginRegistry.findOneByKeychainId(keychainId)).not.toThrow();
     const keychainPlugin = pluginRegistry.findOneByKeychainId(keychainId);
-    t.equal(keychainPlugin, mockKeychainPlugin, "Finds same object OK");
+    expect(keychainPlugin).toEqual(mockKeychainPlugin);
 
-    t.throws(
-      () => pluginRegistry.findOneByKeychainId(""),
-      /need keychainId arg as non-blank string/,
-      "Check for keychain ID blankness OK",
-    );
-    t.throws(
-      () => pluginRegistry.findOneByKeychainId("x"),
-      /No keychain found for ID/,
-      "Throws for keychain not found OK",
-    );
-
-    t.end();
+    expect(() => pluginRegistry.findOneByKeychainId("")).toThrow();
+    expect(() => pluginRegistry.findOneByKeychainId("x")).toThrow();
   });
 
-  test("findOneById() finds plugin by its instanceID", (t: Test) => {
-    t.doesNotThrow(() => pluginRegistry.findOneById(instanceId));
+  test("findOneById() finds plugin by its instanceID", () => {
+    expect(() => pluginRegistry.findOneById(instanceId)).not.toThrow();
     const keychainPlugin = pluginRegistry.findOneById(instanceId).get();
-    t.equal(keychainPlugin, mockKeychainPlugin, "Finds same object by ID OK");
+    expect(keychainPlugin).toEqual(mockKeychainPlugin);
+    expect(() => pluginRegistry.findOneById("")).toThrow();
 
-    t.throws(
-      () => pluginRegistry.findOneById(""),
-      /instanceId.*Need non-blank/,
-      "Check for instance ID blankness OK",
-    );
-
-    t.true(
-      pluginRegistry.findOneById("x").isEmpty(),
-      "return empty optional for non-existent instance ID OK",
-    );
-
-    t.end();
+    expect(pluginRegistry.findOneById("x").isEmpty()).toBe(true);
   });
 
-  test("getOneById() finds plugin by its instanceID", (t: Test) => {
-    t.doesNotThrow(() => pluginRegistry.getOneById(instanceId));
+  test("getOneById() finds plugin by its instanceID", () => {
+    expect(() => pluginRegistry.getOneById(instanceId)).not.toThrow();
     const keychainPlugin = pluginRegistry.getOneById(instanceId);
-    t.equal(keychainPlugin, mockKeychainPlugin, "Finds same object by ID OK");
+    expect(keychainPlugin).toEqual(mockKeychainPlugin);
+    expect(() => pluginRegistry.getOneById("")).toThrow();
 
-    t.throws(
-      () => pluginRegistry.getOneById(""),
-      /instanceId.*Need non-blank/,
-      "Check for instance ID blankness OK",
-    );
-
-    t.throws(
-      () => pluginRegistry.getOneById("x"),
-      /not/,
-      "Plugin x not present in registry",
-    );
-
-    t.end();
+    expect(() => pluginRegistry.getOneById("x")).toThrow();
   });
-
-  tMain.end();
 });

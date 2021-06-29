@@ -1,6 +1,7 @@
 import path from "path";
-import test, { Test } from "tape-promise/tape";
 import { v4 as uuidv4 } from "uuid";
+import "jest-extended";
+import test, { Test } from "tape-promise/tape";
 
 import { LogLevelDesc } from "@hyperledger/cactus-common";
 
@@ -54,4 +55,5 @@ test("can import plugins at runtime (CLI)", async (t: Test) => {
     "failed to start API server with dynamic plugin imports configured for it...",
   );
   test.onFinish(() => apiServer.shutdown());
+  t.end();
 });

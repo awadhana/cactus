@@ -1,7 +1,9 @@
 import os from "os";
 import path from "path";
-import test, { Test } from "tape-promise/tape";
 import type { IncomingMessage } from "http";
+import test, { Test } from "tape-promise/tape";
+
+import "jest-extended";
 import { v4 as uuidV4 } from "uuid";
 import fs from "fs-extra";
 import { Logger, LoggerProvider } from "@hyperledger/cactus-common";
@@ -14,6 +16,8 @@ LoggerProvider.setLogLevel("DEBUG");
 const log: Logger = LoggerProvider.getOrCreate({ label: "containers-test" });
 
 test("pushes file to container unharmed", async (t: Test) => {
+  t.comment("I'm just here for the error of no t in the method");
+
   const anHttpEchoContainer = new HttpEchoContainer();
   log.debug("Starting HttpEchoContainer...");
   const container = await anHttpEchoContainer.start();
@@ -47,62 +51,58 @@ test("pushes file to container unharmed", async (t: Test) => {
     dstFileName,
   });
 
-  t.ok(res, "putArchive() Docker API response OK");
-  t.ok(typeof res.statusCode === "number", "API response.statusCode OK");
+  expect(res).toBeTruthy();
+  expect(typeof res.statusCode).toBe("number");
   const statusCode: number = res.statusCode as number;
 
-  t.ok(statusCode > 199, "putArchive() API res.statusCode > 199");
-  t.ok(statusCode < 300, "putArchive() API res.statusCode < 300");
-  t.equal(res.statusMessage, "OK", "putArchive() res.statusMessage OK");
+  expect(statusCode).toBeWithin(199, 300);
+  expect(res.statusMessage).toEqual("OK");
 
   log.debug("Put file result: %o %o", res.statusCode, res.statusMessage);
 
   const fileAsString2 = await Containers.pullFile(container, dstFilePath);
-  t.ok(fileAsString2, "Read back file contents truthy");
+  expect(fileAsString2).toBeTruthy();
 
   const fileContents2 = JSON.parse(fileAsString2);
-  t.ok(fileContents2, "Read back file JSON.parse() OK");
-  t.equal(fileContents2.id, fileContents.id, "File UUIDs OK");
-
-  t.end();
+  expect(fileContents2).toBeTruthy();
+  expect(fileContents2.id).toEqual(fileContents.id);
 });
 
-test("Can obtain docker diagnostics info", async (t: Test) => {
+test("Can obtain docker diagnostics info", async () => {
   const httpEchoContainer = new HttpEchoContainer();
   test.onFinish(async () => {
     await httpEchoContainer.stop();
     await httpEchoContainer.destroy();
   });
-  t.ok(httpEchoContainer, "httpEchoContainer truthy OK");
+  expect(httpEchoContainer).toBeTruthy();
   const container = await httpEchoContainer.start();
-  t.ok(container, "container truthy OK");
+  expect(container).toBeTruthy();
 
   const diag = await Containers.getDiagnostics({ logLevel: "TRACE" });
-  t.ok(diag, "diag truthy OK");
+  expect(diag).toBeTruthy();
 
-  t.ok(diag.containers, "diag.containers truthy OK");
-  t.ok(Array.isArray(diag.containers), "diag.containers is Array OK");
-  t.ok(diag.containers.length > 0, "diag.containers not empty array OK");
+  expect(diag.containers).toBeTruthy();
+  expect(diag.containers).toBeArray();
+  expect(diag.containers.length > 0).toBe(true);
 
-  t.ok(diag.images, "diag.images truthy OK");
-  t.ok(diag.images.length > 0, "diag.images not empty array OK");
-  t.ok(Array.isArray(diag.images), "diag.images is Array OK");
+  expect(diag.images).toBeTruthy();
+  expect(diag.images.length > 0).toBe(true);
+  expect(diag.images).toBeArray();
 
-  t.ok(diag.info, "diag.info truthy OK");
+  expect(diag.info).toBeTruthy();
 
-  t.ok(diag.networks, "diag.networks truthy OK");
-  t.ok(diag.networks.length > 0, "diag.networks not empty array OK");
-  t.ok(Array.isArray(diag.networks), "diag.networks is Array OK");
+  expect(diag.networks).toBeTruthy();
+  expect(diag.networks.length > 0).toBe(true);
+  expect(diag.networks).toBeArray();
 
-  t.ok(diag.version, "diag.version truthy OK");
+  expect(diag.version).toBeTruthy();
 
-  t.ok(diag.volumes, "diag.volumes truthy OK");
-  t.ok(diag.volumes.Volumes, "diag.volumes.Volumes truthy OK");
-  t.ok(Array.isArray(diag.volumes.Volumes), "diag.volumes.Volumes is Array OK");
-  t.end();
+  expect(diag.volumes).toBeTruthy();
+  expect(diag.volumes.Volumes).toBeTruthy();
+  expect(diag.volumes.Volumes).toBeArray();
 });
 
-test("Can report error if docker daemon is not accessable", async (t: Test) => {
+test("Can report error if docker daemon is not accessable", async () => {
   const badSocketPath = "/some-non-existent-path/to-make-it-trip-up/";
   try {
     await Containers.getDiagnostics({
@@ -113,13 +113,12 @@ test("Can report error if docker daemon is not accessable", async (t: Test) => {
         socketPath: badSocketPath,
       },
     });
-    t.fail("Containers.getDiagnostics was supposed to fail but did not.");
+    fail("Containers.getDiagnostics was supposed to fail but did not.");
   } catch (ex) {
-    t.ok(ex, "exception thrown is truthy OK");
-    t.ok(ex.cause, "ex.cause truthy OK");
-    t.ok(ex.cause.message, "ex.cause.message truthy OK");
+    expect(ex).toBeTruthy();
+    expect(ex.cause).toBeTruthy();
+    expect(ex.cause.message).toBeTruthy();
     const causeMsgIsInformative = ex.cause.message.includes(badSocketPath);
-    t.true(causeMsgIsInformative, "causeMsgIsInformative");
+    expect(causeMsgIsInformative).toBe(true);
   }
-  t.end();
 });

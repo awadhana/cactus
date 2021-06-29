@@ -1,5 +1,6 @@
 import http from "http";
 import type { AddressInfo } from "net";
+import "jest-extended";
 import test, { Test } from "tape-promise/tape";
 import { v4 as uuidv4 } from "uuid";
 import express from "express";
@@ -39,14 +40,12 @@ const connectorId = uuidv4();
 const logLevel: LogLevelDesc = "INFO";
 const testCase = "Test get invalid single status";
 
-test("BEFORE " + testCase, async (t: Test) => {
+test("BEFORE " + testCase, async () => {
   const pruning = pruneDockerAllIfGithubAction({ logLevel });
-  await t.doesNotReject(pruning, "Pruning did not throw OK");
-  t.end();
+  await expect(pruning).resolves.toBeTruthy();
 });
 
 test(testCase, async (t: Test) => {
-  t.comment("Starting Besu Test Ledger");
   const besuTestLedger = new BesuTestLedger({ logLevel });
 
   test.onFinish(async () => {
@@ -137,7 +136,6 @@ test(testCase, async (t: Test) => {
 
   const web3 = new Web3(rpcApiHttpHost);
 
-  t.comment("Deploys HashTimeLock via .json file on initialize function");
   const initRequest: InitializeRequest = {
     connectorId,
     keychainId,
@@ -146,19 +144,12 @@ test(testCase, async (t: Test) => {
     gas: DataTest.estimated_gas,
   };
   const deployOut = await pluginHtlc.initialize(initRequest);
-  t.ok(
-    deployOut.transactionReceipt,
-    "pluginHtlc.initialize() output.transactionReceipt is truthy OK",
-  );
-  t.ok(
-    deployOut.transactionReceipt.contractAddress,
-    "pluginHtlc.initialize() output.transactionReceipt.contractAddress is truthy OK",
-  );
+  expect(deployOut.transactionReceipt).toBeTruthy();
+  expect(deployOut.transactionReceipt.contractAddress).toBeTruthy();
   const hashTimeLockAddress = deployOut.transactionReceipt
     .contractAddress as string;
 
   //Deploy DemoHelpers
-  t.comment("Deploys DemoHelpers via .json file on deployContract function");
   const deployOutDemo = await connector.deployContract({
     contractName: DemoHelperJSON.contractName,
     contractAbi: DemoHelperJSON.abi,
@@ -168,20 +159,12 @@ test(testCase, async (t: Test) => {
     constructorArgs: [],
     gas: DataTest.estimated_gas,
   });
-  t.ok(deployOutDemo, "deployContract() output is truthy OK");
-  t.ok(
-    deployOutDemo.transactionReceipt,
-    "deployContract() output.transactionReceipt is truthy OK",
-  );
-  t.ok(
-    deployOutDemo.transactionReceipt.contractAddress,
-    "deployContract() output.transactionReceipt.contractAddress is truthy OK",
-  );
+  expect(deployOutDemo).toBeTruthy();
+  expect(deployOutDemo.transactionReceipt).toBeTruthy();
+  expect(deployOutDemo.transactionReceipt.contractAddress).toBeTruthy();
 
-  t.comment("Get account balance");
   const balance = await web3.eth.getBalance(firstHighNetWorthAccount);
 
-  t.comment("Create new contract for HTLC");
   const bodyObj: NewContractObj = {
     contractAddress: hashTimeLockAddress,
     inputAmount: 10,
@@ -197,17 +180,12 @@ test(testCase, async (t: Test) => {
     gas: DataTest.estimated_gas,
   };
   const resp = await api.newContractV1(bodyObj);
-  t.ok(resp, "response newContract is OK");
-  t.equal(resp.status, 200, "response status newContract is OK");
+  expect(resp).toBeTruthy();
+  expect(resp.status).toEqual(200);
 
-  t.comment("Get single status of HTLC");
   const balance2 = await web3.eth.getBalance(firstHighNetWorthAccount);
 
-  t.equal(
-    parseInt(balance),
-    parseInt(balance2) - 10,
-    "Balance of account is OK",
-  );
+  expect(parseInt(balance)).toEqual(parseInt(balance2) - 10);
   try {
     const fakeId = "0x66616b654964";
     const res = await api.getSingleStatusV1({
@@ -216,9 +194,9 @@ test(testCase, async (t: Test) => {
       connectorId,
       keychainId: "",
     });
-    t.equal(res.status, 500, "response status is 500");
+    expect(res.status).toEqual(500);
   } catch (e) {
-    t.equal(e.response.status, 500);
+    expect(e.response.status).toEqual(500);
   }
   t.end();
 });

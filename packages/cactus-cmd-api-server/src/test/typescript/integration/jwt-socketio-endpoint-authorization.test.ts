@@ -1,6 +1,8 @@
-import test, { Test } from "tape-promise/tape";
 import { v4 as uuidv4 } from "uuid";
 import { JWK, JWT } from "jose";
+import "jest-extended";
+import test, { Test } from "tape-promise/tape";
+
 import type { Options as ExpressJwtOptions } from "express-jwt";
 import type { AuthorizeOptions as SocketIoJwtOptions } from "@thream/socketio-jwt";
 
@@ -25,6 +27,8 @@ const log = LoggerProvider.getOrCreate({
 });
 
 test(testCase, async (t: Test) => {
+  t.comment("I'm just here for the error of no t in the method");
+
   try {
     const jwtKeyPair = await JWK.generate("RSA", 4096);
     const jwtPublicKey = jwtKeyPair.toPEM(false);
@@ -38,7 +42,7 @@ test(testCase, async (t: Test) => {
       secret: jwtPublicKey,
       algorithms: ["RS256"],
     };
-    t.ok(expressJwtOptions, "Express JWT config truthy OK");
+    expect(expressJwtOptions).toBeTruthy();
 
     const authorizationConfig: IAuthorizationConfig = {
       unprotectedEndpointExemptions: [],
@@ -67,7 +71,7 @@ test(testCase, async (t: Test) => {
 
     const startResponse = apiServer.start();
     await t.doesNotReject(startResponse, "API server started OK");
-    t.ok(startResponse, "API server start response truthy OK");
+    expect(startResponse).toBeTruthy();
 
     const addressInfoApi = (await startResponse).addressInfoApi;
     const protocol = apiSrvOpts.apiTlsEnabled ? "https" : "http";
@@ -81,10 +85,10 @@ test(testCase, async (t: Test) => {
       audience: expressJwtOptions.audience,
     };
     const validJwt = JWT.sign(jwtPayload, jwtKeyPair, jwtSignOptions);
-    t.ok(validJwt, "JWT signed truthy OK");
+    expect(validJwt).toBeTruthy();
 
     const validBearerToken = `Bearer ${validJwt}`;
-    t.ok(validBearerToken, "validBearerToken truthy OK");
+    expect(validBearerToken).toBeTruthy();
 
     const apiClientBad = new ApiServerApiClient(
       new ApiServerApiClientConfiguration({
@@ -140,14 +144,14 @@ test(testCase, async (t: Test) => {
       );
 
       const resHc = await apiClientGood.getHealthCheckV1();
-      t.ok(resHc, "healthcheck response truthy OK");
-      t.equal(resHc.status, 200, "healthcheck response status === 200 OK");
-      t.equal(typeof resHc.data, "object", "typeof resHc.data is 'object' OK");
-      t.ok(resHc.data.createdAt, "resHc.data.createdAt truthy OK");
-      t.ok(resHc.data.memoryUsage, "resHc.data.memoryUsage truthy OK");
-      t.ok(resHc.data.memoryUsage.rss, "resHc.data.memoryUsage.rss truthy OK");
-      t.ok(resHc.data.success, "resHc.data.success truthy OK");
-      t.true(isHealthcheckResponse(resHc.data), "isHealthcheckResponse OK");
+      expect(resHc).toBeTruthy();
+      expect(resHc.status).toEqual(200);
+      expect(typeof resHc.data).toBeTruthy();
+      expect(resHc.data.createdAt).toBeTruthy();
+      expect(resHc.data.memoryUsage).toBeTruthy();
+      expect(resHc.data.memoryUsage.rss).toBeTruthy();
+      expect(resHc.data.success).toBeTruthy();
+      expect(isHealthcheckResponse(resHc.data)).toBe(true);
     }
 
     {
@@ -155,35 +159,30 @@ test(testCase, async (t: Test) => {
       const healthchecks = await apiClientFixable.watchHealthcheckV1();
       const sub = healthchecks.subscribe((next: HealthCheckResponse) => {
         idx++;
-        t.ok(next, idx + " next healthcheck truthy OK");
-        t.equal(typeof next, "object", idx + "typeof next is 'object' OK");
-        t.ok(next.createdAt, idx + " next.createdAt truthy OK");
-        t.ok(next.memoryUsage, idx + " next.memoryUsage truthy OK");
-        t.ok(next.memoryUsage.rss, idx + " next.memoryUsage.rss truthy OK");
-        t.ok(next.success, idx + " next.success truthy OK");
-        t.true(isHealthcheckResponse(next), idx + " isHealthcheckResponse OK");
+        expect(next).toBeTruthy();
+        expect(typeof next).toEqual("object");
+        expect(next.createdAt).toBeTruthy();
+        expect(next.memoryUsage).toBeTruthy();
+        expect(next.memoryUsage.rss).toBeTruthy();
+        expect(next.success).toBeTruthy();
+        expect(isHealthcheckResponse(next)).toBe(true);
         if (idx > 2) {
           sub.unsubscribe();
         }
       });
 
-      const all = await healthchecks.toPromise();
-      t.comment("all=" + JSON.stringify(all));
-
       const resHc = await apiClientFixable.getHealthCheckV1();
-      t.ok(resHc, "healthcheck response truthy OK");
-      t.equal(resHc.status, 200, "healthcheck response status === 200 OK");
-      t.equal(typeof resHc.data, "object", "typeof resHc.data is 'object' OK");
-      t.ok(resHc.data.createdAt, "resHc.data.createdAt truthy OK");
-      t.ok(resHc.data.memoryUsage, "resHc.data.memoryUsage truthy OK");
-      t.ok(resHc.data.memoryUsage.rss, "resHc.data.memoryUsage.rss truthy OK");
-      t.ok(resHc.data.success, "resHc.data.success truthy OK");
-      t.true(isHealthcheckResponse(resHc.data), "isHealthcheckResponse OK");
+      expect(resHc).toBeTruthy();
+      expect(resHc.status).toEqual(200);
+      expect(typeof resHc.data).toBeTruthy();
+      expect(resHc.data.createdAt).toBeTruthy();
+      expect(resHc.data.memoryUsage).toBeTruthy();
+      expect(resHc.data.memoryUsage.rss).toBeTruthy();
+      expect(resHc.data.success).toBeTruthy();
+      expect(isHealthcheckResponse(resHc.data)).toBe(true);
     }
-    t.end();
   } catch (ex) {
     log.error(ex);
-    t.fail("Exception thrown during test execution, see above for details!");
-    throw ex;
+    fail("Exception thrown during test execution, see above for details!");
   }
 });

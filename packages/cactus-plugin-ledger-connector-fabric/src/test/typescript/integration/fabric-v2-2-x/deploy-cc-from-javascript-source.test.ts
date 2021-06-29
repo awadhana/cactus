@@ -2,8 +2,9 @@ import { AddressInfo } from "net";
 import http from "http";
 import fs from "fs-extra";
 import path from "path";
-
+import "jest-extended";
 import test, { Test } from "tape-promise/tape";
+
 import { v4 as uuidv4 } from "uuid";
 
 import express from "express";
@@ -42,13 +43,14 @@ import { Configuration } from "@hyperledger/cactus-core-api";
 const testCase = "deploys Fabric 2.x contract from javascript source";
 const logLevel: LogLevelDesc = "TRACE";
 
-test("BEFORE " + testCase, async (t: Test) => {
+test("BEFORE " + testCase, async () => {
   const pruning = pruneDockerAllIfGithubAction({ logLevel });
-  await t.doesNotReject(pruning, "Pruning didn't throw OK");
-  t.end();
+  await expect(pruning).resolves.toBeTruthy();
 });
 
 test(testCase, async (t: Test) => {
+  t.comment("I'm just here for the error of no t in the method");
+
   const channelId = "mychannel";
   const channelName = channelId;
 
@@ -76,7 +78,7 @@ test(testCase, async (t: Test) => {
   await ledger.start();
 
   const connectionProfile = await ledger.getConnectionProfileOrg1();
-  t.ok(connectionProfile, "getConnectionProfileOrg1() out truthy OK");
+  expect(connectionProfile).toBeTruthy();
 
   const enrollAdminOut = await ledger.enrollAdmin();
   const adminWallet = enrollAdminOut[1];
@@ -243,8 +245,8 @@ test(testCase, async (t: Test) => {
   });
 
   const { packageIds, lifecycle, success } = res.data;
-  t.equal(res.status, 200, "res.status === 200 OK");
-  t.true(success, "res.data.success === true");
+  expect(res.status).toEqual(200);
+  expect(success).toBe(true);
 
   const {
     approveForMyOrgList,
@@ -301,10 +303,9 @@ test(testCase, async (t: Test) => {
       keychainRef: keychainEntryKey,
     },
   });
-  t.ok(createRes, "setRes truthy OK");
-  t.true(createRes.status > 199, "createRes status > 199 OK");
-  t.true(createRes.status < 300, "createRes status < 300 OK");
-  t.comment(`BassicAssetTransfer.Create(): ${JSON.stringify(createRes.data)}`);
+  expect(createRes).toBeTruthy();
+  expect(createRes.status > 199).toBe(true);
+  expect(createRes.status < 300).toBe(true);
 
   const getRes = await apiClient.runTransactionV1({
     contractName,
@@ -317,23 +318,20 @@ test(testCase, async (t: Test) => {
       keychainRef: keychainEntryKey,
     },
   });
-  t.ok(getRes, "getRes truthy OK");
-  t.ok(getRes.data, "getRes.data truthy OK");
-  t.ok(getRes.data.functionOutput, "getRes.data.functionOutput truthy OK");
-  t.true(getRes.status > 199 && createRes.status < 300, "getRes status 2xx OK");
-  t.comment(`HelloWorld.get() ResponseBody: ${JSON.stringify(getRes.data)}`);
+  expect(getRes).toBeTruthy();
+  expect(getRes.data).toBeTruthy();
+  expect(getRes.data.functionOutput).toBeTruthy();
+  expect(getRes.status > 199 && createRes.status < 300).toBe(true);
 
   const asset = JSON.parse(getRes.data.functionOutput);
 
-  t.ok(asset, "JSON.parse(getRes.data.functionOutput) truthy OK");
+  expect(asset).toBeTruthy();
 
-  t.ok(asset.ID, "asset.ID truthy OK");
-  t.equal(asset.ID, assetId, "asset.ID === assetId truthy OK");
+  expect(asset.ID).toBeTruthy();
+  expect(asset.ID).toEqual(assetId);
 
   // Note: the capital spelling on "Owner" is not a bug. The fabric-samples
   // repo has the spelling different from the golang chaincode as well.
-  t.ok(asset.Owner, "asset.Owner truthy OK");
-  t.equal(asset.Owner, assetOwner, "asset.owner === assetOwner OK");
-
-  t.end();
+  expect(asset.Owner).toBeTruthy();
+  expect(asset.Owner).toEqual(assetOwner);
 });

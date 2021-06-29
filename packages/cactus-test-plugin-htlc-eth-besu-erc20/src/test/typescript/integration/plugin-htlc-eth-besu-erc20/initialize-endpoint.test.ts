@@ -1,5 +1,6 @@
-import test, { Test } from "tape-promise/tape";
 import http from "http";
+import "jest-extended";
+import test, { Test } from "tape-promise/tape";
 import type { AddressInfo } from "net";
 import { v4 as uuidv4 } from "uuid";
 import express from "express";
@@ -45,22 +46,17 @@ const web3SigningCredential: Web3SigningCredential = {
 } as Web3SigningCredential;
 const testCase = "Test initialize function with valid params";
 
-test("BEFORE " + testCase, async (t: Test) => {
+test("BEFORE " + testCase, async () => {
   const pruning = pruneDockerAllIfGithubAction({ logLevel });
-  await t.doesNotReject(pruning, "Pruning did not throw OK");
-  t.end();
+  await expect(pruning).resolves.toBeTruthy();
 });
 
-test(testCase, async (t: Test) => {
-  t.comment("Starting Besu Test Ledger");
+test(testCase, async () => {
   const besuTestLedger = new BesuTestLedger();
   await besuTestLedger.start();
-  t.comment("Ledger #1 started");
 
   test.onFinish(async () => {
-    t.comment("Ledger #1 stopping...");
     await besuTestLedger.stop();
-    t.comment("Ledger #1 destroying...");
     await besuTestLedger.destroy();
     await pruneDockerAllIfGithubAction({ logLevel });
   });
@@ -125,7 +121,6 @@ test(testCase, async (t: Test) => {
   await pluginHtlc.getOrCreateWebServices();
   await pluginHtlc.registerWebServices(expressApp);
 
-  t.comment("Deploys HashTimeLock via .json file on initialize function");
   const request: InitializeRequest = {
     connectorId,
     keychainId,
@@ -135,30 +130,19 @@ test(testCase, async (t: Test) => {
   };
 
   const res = await api.initializeV1(request);
-  t.equal(res.status, 200, "response status is 200 OK");
+  expect(res.status).toEqual(200);
 
-  t.ok(res.data, "pluginHtlc.initialize() output is truthy OK");
-  t.ok(
-    res.data.transactionReceipt,
-    "pluginHtlc.initialize() output.transactionReceipt is truthy OK",
-  );
-  t.ok(
-    res.data.transactionReceipt?.contractAddress,
-    "pluginHtlc.initialize() output.transactionReceipt.contractAddress is truthy OK",
-  );
-  t.end();
+  expect(res.data).toBeTruthy();
+  expect(res.data.transactionReceipt).toBeTruthy();
+  expect(res.data.transactionReceipt?.contractAddress).toBeTruthy();
 });
 
 test("Test initialize function with invalid params", async (t: Test) => {
-  t.comment("Starting Besu Test Ledger");
   const besuTestLedger = new BesuTestLedger();
   await besuTestLedger.start();
-  t.comment("Ledger #2 started");
 
   test.onFinish(async () => {
-    t.comment("Ledger #2 stopping...");
     await besuTestLedger.stop();
-    t.comment("Ledger #2 destroying...");
     await besuTestLedger.destroy();
   });
 
@@ -222,7 +206,6 @@ test("Test initialize function with invalid params", async (t: Test) => {
   await pluginHtlc.getOrCreateWebServices();
   await pluginHtlc.registerWebServices(expressApp);
 
-  t.comment("Deploys HashTimeLock via .json file on initialize function");
   const fakeId = "0x66616b654964";
   const request: InitializeRequest = {
     connectorId: fakeId,
@@ -233,9 +216,9 @@ test("Test initialize function with invalid params", async (t: Test) => {
   };
   try {
     const res = await api.initializeV1(request);
-    t.equal(res.status, 400, "response status is 400");
+    expect(res.status).toEqual(400);
   } catch (error) {
-    t.equal(error.response.status, 400, "response status is 400");
+    expect(error.response.status).toEqual(400);
   }
   t.end();
 });

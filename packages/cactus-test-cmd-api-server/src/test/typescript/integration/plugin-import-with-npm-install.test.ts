@@ -1,6 +1,8 @@
 import path from "path";
-import test, { Test } from "tape-promise/tape";
 import { v4 as uuidv4 } from "uuid";
+import "jest-extended";
+import test, { Test } from "tape-promise/tape";
+
 import { JWK } from "jose";
 
 import { LogLevelDesc } from "@hyperledger/cactus-common";
@@ -80,15 +82,8 @@ test("can instal plugins at runtime based on imports", async (t: Test) => {
     startResponse,
     "failed to start API server with dynamic plugin imports configured for it...",
   );
-  t.ok(startResponse, "startResponse truthy OK");
+  expect(startResponse).toBeTruthy();
 
-  const addressInfoApi = (await startResponse).addressInfoApi;
-  const protocol = apiServerOptions.apiTlsEnabled ? "https" : "http";
-  const { address, port } = addressInfoApi;
-  const apiHost = `${protocol}://${address}:${port}`;
-  t.comment(
-    `Metrics URL: ${apiHost}/api/v1/api-server/get-prometheus-exporter-metrics`,
-  );
-
+  await startResponse;
   test.onFinish(() => apiServer.shutdown());
 });

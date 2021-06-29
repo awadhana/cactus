@@ -1,5 +1,5 @@
+import "jest-extended";
 import test, { Test } from "tape-promise/tape";
-
 import { v4 as uuidv4 } from "uuid";
 import { createServer } from "http";
 import KeyEncoder from "key-encoder";
@@ -40,10 +40,9 @@ import { PluginKeychainMemory } from "@hyperledger/cactus-plugin-keychain-memory
 const testCase = "Test sign transaction endpoint";
 const logLevel: LogLevelDesc = "TRACE";
 
-test("BEFORE " + testCase, async (t: Test) => {
+test("BEFORE " + testCase, async () => {
   const pruning = pruneDockerAllIfGithubAction({ logLevel });
-  await t.doesNotReject(pruning, "Pruning didn't throw OK");
-  t.end();
+  await expect(pruning).resolves.toBeTruthy();
 });
 
 test(testCase, async (t: Test) => {
@@ -69,9 +68,7 @@ test(testCase, async (t: Test) => {
     httpServer1.listen(0, "127.0.0.1");
   });
   const addressInfo1 = httpServer1.address() as AddressInfo;
-  t.comment(`HttpServer1 AddressInfo: ${JSON.stringify(addressInfo1)}`);
   const node1Host = `http://${addressInfo1.address}:${addressInfo1.port}`;
-  t.comment(`Cactus Node 1 Host: ${node1Host}`);
 
   const besuTestLedger = new BesuTestLedger();
   await besuTestLedger.start();
@@ -133,7 +130,6 @@ test(testCase, async (t: Test) => {
   await apiServer.start();
 
   // 7. Instantiate the main SDK dynamically with whatever port the API server ended up bound to (port 0)
-  t.comment(`AddressInfo: ${JSON.stringify(addressInfo1)}`);
 
   const web3Provider = new Web3.providers.HttpProvider(rpcApiHttpHost);
   const web3 = new Web3(web3Provider);
@@ -173,8 +169,8 @@ test(testCase, async (t: Test) => {
 
   // Test for 200 valid response test case
   const res = await api.signTransactionV1(request);
-  t.ok(res, "API response object is truthy");
-  t.deepEquals(signDataHex, res.data.signature, "Signature data are equal");
+  expect(res).toBeTruthy();
+  expect(signDataHex).toBe(res.data.signature);
 
   // Test for 404 Transaction not found test case
   try {
@@ -186,11 +182,8 @@ test(testCase, async (t: Test) => {
     };
     await api.signTransactionV1(notFoundRequest);
   } catch (error) {
-    t.equal(error.response.status, 404, "HTTP response status are equal");
-    t.equal(
-      error.response.statusText,
-      "Transaction not found",
-      "Response text are equal",
-    );
+    expect(error.response.status).toEqual(404);
+    expect(error.response.statusText).toEqual("Transaction not found");
   }
+  t.end();
 });

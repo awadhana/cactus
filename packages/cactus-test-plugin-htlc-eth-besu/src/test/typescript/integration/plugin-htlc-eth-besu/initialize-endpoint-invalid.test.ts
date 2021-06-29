@@ -1,5 +1,5 @@
 import http from "http";
-import type { AddressInfo } from "net";
+import "jest-extended";
 import test, { Test } from "tape-promise/tape";
 import { v4 as uuidv4 } from "uuid";
 import express from "express";
@@ -36,14 +36,12 @@ const logLevel: LogLevelDesc = "INFO";
 
 const testCase = "Test invalid initialize";
 
-test("BEFORE " + testCase, async (t: Test) => {
+test("BEFORE " + testCase, async () => {
   const pruning = pruneDockerAllIfGithubAction({ logLevel });
-  await t.doesNotReject(pruning, "Pruning did not throw OK");
-  t.end();
+  await expect(pruning).resolves.toBeTruthy();
 });
 
 test(testCase, async (t: Test) => {
-  t.comment("Starting Besu Test Ledger");
   const besuTestLedger = new BesuTestLedger({ logLevel });
 
   test.onFinish(async () => {
@@ -116,17 +114,12 @@ test(testCase, async (t: Test) => {
     port: 0,
     server,
   };
-  const addressInfo = (await Servers.listen(listenOptions)) as AddressInfo;
+  await Servers.listen(listenOptions);
   test.onFinish(async () => await Servers.shutdown(server));
-  const { address, port } = addressInfo;
-  const apiHost = `http://${address}:${port}`;
-
-  t.comment(apiHost);
 
   await pluginHtlc.getOrCreateWebServices();
   await pluginHtlc.registerWebServices(expressApp);
 
-  t.comment("Deploys HashTimeLock via .json file on initialize function");
   try {
     const initRequest: InitializeRequest = {
       connectorId: "JORDI",
@@ -136,12 +129,9 @@ test(testCase, async (t: Test) => {
       gas: DataTest.estimated_gas,
     };
     const deployOut = await pluginHtlc.initialize(initRequest);
-    t.ok(
-      deployOut.transactionReceipt,
-      "pluginHtlc.initialize() output.transactionReceipt is truthy OK",
-    );
+    expect(deployOut.transactionReceipt).toBeTruthy();
   } catch (error) {
-    t.ok(error, "pluginHtlc.initialize() error is truthy OK");
+    expect(error).toBeTruthy();
   }
   t.end();
 });

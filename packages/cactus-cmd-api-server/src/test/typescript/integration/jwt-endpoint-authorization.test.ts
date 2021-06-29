@@ -1,8 +1,9 @@
 import path from "path";
-import test, { Test } from "tape-promise/tape";
 import { v4 as uuidv4 } from "uuid";
 import { JWK, JWT } from "jose";
 import expressJwt from "express-jwt";
+import "jest-extended";
+import test, { Test } from "tape-promise/tape";
 
 import {
   ApiServer,
@@ -27,6 +28,8 @@ const log = LoggerProvider.getOrCreate({
 });
 
 test(testCase, async (t: Test) => {
+  t.comment("I'm just here for the error of no t in the method");
+
   try {
     const keyPair = await JWK.generate("EC", "secp256k1", { use: "sig" }, true);
     const keyPairPem = keyPair.toPEM(true);
@@ -46,7 +49,7 @@ test(testCase, async (t: Test) => {
       audience: uuidv4(),
       issuer: uuidv4(),
     };
-    t.ok(expressJwtOptions, "Express JWT config truthy OK");
+    expect(expressJwtOptions).toBeTruthy();
 
     const jwtPayload = { name: "Peter", location: "London" };
     const jwtSignOptions: JWT.SignOptions = {
@@ -116,7 +119,7 @@ test(testCase, async (t: Test) => {
       startResponse,
       "failed to start API server with dynamic plugin imports configured for it...",
     );
-    t.ok(startResponse, "startResponse truthy OK");
+    expect(startResponse).toBeTruthy();
 
     const addressInfoApi = (await startResponse).addressInfoApi;
     const protocol = apiSrvOpts.apiTlsEnabled ? "https" : "http";
@@ -127,18 +130,16 @@ test(testCase, async (t: Test) => {
     const conf = new Configuration({ basePath: apiHost, baseOptions });
     const apiClient = new ApiServerApi(conf);
     const resHc = await apiClient.getHealthCheckV1();
-    t.ok(resHc, "healthcheck response truthy OK");
-    t.equal(resHc.status, 200, "healthcheck response status === 200 OK");
-    t.equal(typeof resHc.data, "object", "typeof resHc.data is 'object' OK");
-    t.ok(resHc.data.createdAt, "resHc.data.createdAt truthy OK");
-    t.ok(resHc.data.memoryUsage, "resHc.data.memoryUsage truthy OK");
-    t.ok(resHc.data.memoryUsage.rss, "resHc.data.memoryUsage.rss truthy OK");
-    t.ok(resHc.data.success, "resHc.data.success truthy OK");
-    t.true(isHealthcheckResponse(resHc.data), "isHealthcheckResponse OK");
-    t.end();
+    expect(resHc).toBeTruthy();
+    expect(resHc.status).toEqual(200);
+    expect(typeof resHc.data).toBeTruthy();
+    expect(resHc.data.createdAt).toBeTruthy();
+    expect(resHc.data.memoryUsage).toBeTruthy();
+    expect(resHc.data.memoryUsage.rss).toBeTruthy();
+    expect(resHc.data.success).toBeTruthy();
+    expect(isHealthcheckResponse(resHc.data)).toBe(true);
   } catch (ex) {
     log.error(ex);
-    t.fail("Exception thrown during test execution, see above for details!");
-    throw ex;
+    fail("Exception thrown during test execution, see above for details!");
   }
 });

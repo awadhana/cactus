@@ -1,7 +1,8 @@
 import http from "http";
 import type { AddressInfo } from "net";
-import test, { Test } from "tape-promise/tape";
 import { v4 as uuidv4 } from "uuid";
+import "jest-extended";
+import test, { Test } from "tape-promise/tape";
 import express from "express";
 import bodyParser from "body-parser";
 import {
@@ -40,14 +41,12 @@ const connectorId = uuidv4();
 const logLevel: LogLevelDesc = "INFO";
 const testCase = "Test invalid refund";
 
-test("BEFORE " + testCase, async (t: Test) => {
+test("BEFORE " + testCase, async () => {
   const pruning = pruneDockerAllIfGithubAction({ logLevel });
-  await t.doesNotReject(pruning, "Pruning did not throw OK");
-  t.end();
+  await expect(pruning).resolves.toBeTruthy();
 });
 
 test(testCase, async (t: Test) => {
-  t.comment("Starting Besu Test Ledger");
   const besuTestLedger = new BesuTestLedger({ logLevel });
 
   test.onFinish(async () => {
@@ -131,7 +130,6 @@ test(testCase, async (t: Test) => {
   await pluginHtlc.getOrCreateWebServices();
   await pluginHtlc.registerWebServices(expressApp);
 
-  t.comment("Deploys HashTimeLock via .json file on initialize function");
   const initRequest: InitializeRequest = {
     connectorId,
     keychainId,
@@ -140,19 +138,12 @@ test(testCase, async (t: Test) => {
     gas: DataTest.estimated_gas,
   };
   const deployOut = await pluginHtlc.initialize(initRequest);
-  t.ok(
-    deployOut.transactionReceipt,
-    "pluginHtlc.initialize() output.transactionReceipt is truthy OK",
-  );
-  t.ok(
-    deployOut.transactionReceipt.contractAddress,
-    "pluginHtlc.initialize() output.transactionReceipt.contractAddress is truthy OK",
-  );
+  expect(deployOut.transactionReceipt).toBeTruthy();
+  expect(deployOut.transactionReceipt.contractAddress).toBeTruthy();
   const hashTimeLockAddress = deployOut.transactionReceipt
     .contractAddress as string;
 
   //Deploy DemoHelpers
-  t.comment("Deploys DemoHelpers via .json file on deployContract function");
   const deployOutDemo = await connector.deployContract({
     contractName: DemoHelperJSON.contractName,
     contractAbi: DemoHelperJSON.abi,
@@ -162,16 +153,9 @@ test(testCase, async (t: Test) => {
     constructorArgs: [],
     gas: DataTest.estimated_gas,
   });
-  t.ok(deployOutDemo, "deployContract() output is truthy OK");
-  t.ok(
-    deployOutDemo.transactionReceipt,
-    "deployContract() output.transactionReceipt is truthy OK",
-  );
-  t.ok(
-    deployOutDemo.transactionReceipt.contractAddress,
-    "deployContract() output.transactionReceipt.contractAddress is truthy OK",
-  );
-  t.comment("Get current timestamp");
+  expect(deployOutDemo).toBeTruthy();
+  expect(deployOutDemo.transactionReceipt).toBeTruthy();
+  expect(deployOutDemo.transactionReceipt.contractAddress).toBeTruthy();
   const { callOutput } = await connector.invokeContract({
     contractName: DemoHelperJSON.contractName,
     keychainId,
@@ -180,12 +164,11 @@ test(testCase, async (t: Test) => {
     methodName: "getTimestamp",
     params: [],
   });
-  t.ok(callOutput, "callOutput() output.callOutput is truthy OK");
+  expect(callOutput).toBeTruthy();
   let timestamp = 0;
   timestamp = callOutput as number;
   timestamp = +timestamp + +10;
 
-  t.comment("Create new contract for HTLC");
   const bodyObj: NewContractObj = {
     contractAddress: hashTimeLockAddress,
     inputAmount: 10,
@@ -201,8 +184,8 @@ test(testCase, async (t: Test) => {
     gas: DataTest.estimated_gas,
   };
   const resp = await api.newContractV1(bodyObj);
-  t.ok(resp, "response newContract is OK");
-  t.equal(resp.status, 200, "response status newContract is OK");
+  expect(resp).toBeTruthy();
+  expect(resp.status).toEqual(200);
 
   const responseTxId = await connector.invokeContract({
     contractName: DemoHelperJSON.contractName,
@@ -218,9 +201,8 @@ test(testCase, async (t: Test) => {
       timestamp,
     ],
   });
-  t.ok(responseTxId.callOutput, "result is truthy OK");
+  expect(responseTxId.callOutput).toBeTruthy();
   const id = responseTxId.callOutput as string;
-  t.comment("Refund HTLC");
   try {
     const refundRequest: RefundReq = {
       id,
@@ -229,9 +211,9 @@ test(testCase, async (t: Test) => {
       keychainId,
     };
     const refundResponse = await api.refundV1(refundRequest);
-    t.equal(refundResponse.status, 200);
+    expect(refundResponse.status).toEqual(200);
   } catch (error) {
-    t.equal(error.response.status, 500, "response status is 500");
+    expect(error.response.status).toEqual(500);
   }
   t.end();
 });

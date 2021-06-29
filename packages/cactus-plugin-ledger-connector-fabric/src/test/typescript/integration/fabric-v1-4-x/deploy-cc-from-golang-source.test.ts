@@ -1,14 +1,13 @@
 import { AddressInfo } from "net";
 import http from "http";
+import "jest-extended";
 
-import test, { Test } from "tape-promise/tape";
 import { v4 as uuidv4 } from "uuid";
 
 import express from "express";
 import bodyParser from "body-parser";
 
 import {
-  Containers,
   FabricTestLedgerV1,
   pruneDockerAllIfGithubAction,
 } from "@hyperledger/cactus-test-tooling";
@@ -16,6 +15,7 @@ import {
 import {
   IListenOptions,
   LogLevelDesc,
+  LoggerProvider,
   Servers,
 } from "@hyperledger/cactus-common";
 import { PluginRegistry } from "@hyperledger/cactus-core";
@@ -42,17 +42,17 @@ import { Configuration } from "@hyperledger/cactus-core-api";
 
 const testCase = "deploys contract from go source";
 const logLevel: LogLevelDesc = "TRACE";
-
-test("BEFORE " + testCase, async (t: Test) => {
-  const pruning = pruneDockerAllIfGithubAction({ logLevel });
-  await t.doesNotReject(pruning, "Pruning didn't throw OK");
-  t.end();
+const log = LoggerProvider.getOrCreate({
+  level: logLevel,
+  label: __filename,
 });
 
-test.skip(testCase, async (t: Test) => {
-  test.onFailure(async () => {
-    await Containers.logDiagnostics({ logLevel });
-  });
+test("BEFORE " + testCase, async () => {
+  const pruning = pruneDockerAllIfGithubAction({ logLevel });
+  await expect(pruning).resolves.toBeTruthy();
+});
+
+test.skip(testCase, async () => {
   const ledger = new FabricTestLedgerV1({
     emitContainerLogs: true,
     logLevel,
@@ -69,16 +69,16 @@ test.skip(testCase, async (t: Test) => {
     await pruneDockerAllIfGithubAction({ logLevel });
   };
 
-  test.onFinish(tearDown);
+  afterAll(tearDown);
 
   await ledger.start();
-  t.doesNotThrow(() => ledger.getContainer(), "Container is set OK");
+  expect(() => ledger.getContainer()).not.toThrow();
   const ledgerContainer = ledger.getContainer();
-  t.ok(ledgerContainer, "ledgerContainer truthy OK");
-  t.ok(ledgerContainer.id, "ledgerContainer.id truthy OK");
+  expect(ledgerContainer).toBeTruthy();
+  expect(ledgerContainer.id).toBeTruthy();
 
   const connectionProfile = await ledger.getConnectionProfileOrg1();
-  t.ok(connectionProfile, "getConnectionProfileOrg1() out truthy OK");
+  expect(connectionProfile).toBeTruthy();
 
   const enrollAdminOut = await ledger.enrollAdmin();
   const adminWallet = enrollAdminOut[1];
@@ -158,7 +158,7 @@ test.skip(testCase, async (t: Test) => {
   };
   const addressInfo = (await Servers.listen(listenOptions)) as AddressInfo;
   const { port } = addressInfo;
-  test.onFinish(async () => await Servers.shutdown(server));
+  afterAll(async () => await Servers.shutdown(server));
 
   await plugin.getOrCreateWebServices();
   await plugin.registerWebServices(expressApp);
@@ -211,15 +211,15 @@ test.skip(testCase, async (t: Test) => {
   } = res.data;
 
   installations.forEach((icr: SSHExecCommandResponse, idx: number) => {
-    t.comment(`CC installation ${idx} out: ${icr.stdout}`);
-    t.comment(`CC installation ${idx} err: ${icr.stderr}`);
+    log.debug(`CC installation ${idx} out: ${icr.stdout}`);
+    log.debug(`CC installation ${idx} err: ${icr.stderr}`);
   });
 
-  t.comment(`CC instantiation out: ${instantiation.stdout}`);
-  t.comment(`CC instantiation err: ${instantiation.stderr}`);
+  log.debug(`CC instantiation out: ${instantiation.stdout}`);
+  log.debug(`CC instantiation err: ${instantiation.stderr}`);
 
-  t.equal(res.status, 200, "deployContractGoSourceV1 res.status === 200 OK");
-  t.true(success, "deployContractGoSourceV1 res.data.success === true");
+  expect(res.status).toEqual(200);
+  expect(success).toBe(true);
 
   // FIXME - without this wait it randomly fails with an error claiming that
   // the endorsement was impossible to be obtained. The fabric-samples script
@@ -243,9 +243,8 @@ test.skip(testCase, async (t: Test) => {
     invocationType: FabricContractInvocationType.Send,
     signingCredential,
   });
-  t.ok(setRes, "setRes truthy OK");
-  t.true(setRes.status > 199 && setRes.status < 300, "setRes status 2xx OK");
-  t.comment(`HelloWorld.set() ResponseBody: ${JSON.stringify(setRes.data)}`);
+  expect(setRes).toBeTruthy();
+  expect(setRes.status).toBeWithin(199, 300);
 
   const getRes = await apiClient.runTransactionV1({
     contractName: "hello-world",
@@ -255,9 +254,8 @@ test.skip(testCase, async (t: Test) => {
     invocationType: FabricContractInvocationType.Call,
     signingCredential,
   });
-  t.ok(getRes, "getRes truthy OK");
-  t.true(getRes.status > 199 && setRes.status < 300, "getRes status 2xx OK");
-  t.comment(`HelloWorld.get() ResponseBody: ${JSON.stringify(getRes.data)}`);
-  t.equal(getRes.data.functionOutput, testValue, "get returns UUID OK");
-  t.end();
+  expect(getRes).toBeTruthy();
+
+  expect(getRes.status).toBeWithin(199, 300);
+  expect(getRes.data.functionOutput).toEqual(testValue);
 });

@@ -1,6 +1,8 @@
-import test, { Test } from "tape-promise/tape";
 import { v4 as uuidv4 } from "uuid";
 import { JWK } from "jose";
+import "jest-extended";
+import test, { Test } from "tape-promise/tape";
+
 import expressJwt from "express-jwt";
 
 import { LoggerProvider, LogLevelDesc } from "@hyperledger/cactus-common";
@@ -33,7 +35,7 @@ test(testCase, async (t: Test) => {
       audience: uuidv4(),
       issuer: uuidv4(),
     };
-    t.ok(expressJwtOptions, "Express JWT config truthy OK");
+    expect(expressJwtOptions).toBeTruthy();
 
     const authorizationConfig: IAuthorizationConfig = {
       unprotectedEndpointExemptions: [],
@@ -74,10 +76,8 @@ test(testCase, async (t: Test) => {
       new RegExp(ApiServer.E_NON_EXEMPT_UNPROTECTED_ENDPOINTS),
       mainAssertion,
     );
-    t.end();
   } catch (ex) {
     log.error(ex);
-    t.fail("Exception thrown during test execution, see above for details!");
-    throw ex;
+    fail("Exception thrown during test execution, see above for details!");
   }
 });
