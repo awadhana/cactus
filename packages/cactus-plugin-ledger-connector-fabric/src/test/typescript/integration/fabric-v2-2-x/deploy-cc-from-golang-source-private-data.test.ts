@@ -97,8 +97,6 @@ describe(testCase, () => {
     // test.onFailure(async () => {
     //   await Containers.logDiagnostics({ logLevel });
     // });
-    await ledger.start();
-
     const connectionProfile = await ledger.getConnectionProfileOrg1();
 
     expect(connectionProfile).toBeTruthy();
