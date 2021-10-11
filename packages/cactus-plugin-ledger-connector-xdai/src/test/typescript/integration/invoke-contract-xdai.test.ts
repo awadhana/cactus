@@ -23,18 +23,8 @@ import { PluginImportType } from "@hyperledger/cactus-core-api";
 
 const logLevel: LogLevelDesc = "TRACE";
 let xdaiTestLedger: OpenEthereumTestLedger;
-
-beforeAll(async () => {
-  xdaiTestLedger = new OpenEthereumTestLedger({});
-  await xdaiTestLedger.start();
-});
-
-afterAll(async () => {
-  await xdaiTestLedger.stop();
-  await xdaiTestLedger.destroy();
-});
-
-describe("deploys contract via .json file", () => {
+const testCase = "Xdai Ledger Connector Plugin";
+describe(testCase, () => {
   let contractAddress: string;
   const contractName = "HelloWorld";
   const whalePubKey = K_DEV_WHALE_ACCOUNT_PUBLIC_KEY;
@@ -43,12 +33,22 @@ describe("deploys contract via .json file", () => {
   let connector: PluginLedgerConnectorXdai;
   let web3: Web3;
   let testEthAccount: Account;
-
   let keychainEntryKey: string;
-  let keychainEntryValue;
+  let keychainEntryValue: string, rpcApiHttpHost: string;
 
-  it("setup", async () => {
-    const rpcApiHttpHost = await xdaiTestLedger.getRpcApiHttpHost();
+  beforeAll(async () => {
+    xdaiTestLedger = new OpenEthereumTestLedger({});
+    await xdaiTestLedger.start();
+  });
+
+  afterAll(async () => {
+    await xdaiTestLedger.stop();
+    await xdaiTestLedger.destroy();
+  });
+  beforeAll(async () => {
+    await xdaiTestLedger.start();
+    rpcApiHttpHost = await xdaiTestLedger.getRpcApiHttpHost();
+    expect(rpcApiHttpHost).toBeString();
 
     web3 = new Web3(rpcApiHttpHost);
     testEthAccount = web3.eth.accounts.create(uuidv4());
@@ -64,6 +64,9 @@ describe("deploys contract via .json file", () => {
       backend: new Map([[keychainEntryKey, keychainEntryValue]]),
       logLevel,
     });
+  });
+
+  it("setup", async () => {
     keychainPlugin.set(
       HelloWorldContractJson.contractName,
       JSON.stringify(HelloWorldContractJson),

@@ -53,11 +53,17 @@ describe(testCase, () => {
     type: Web3SigningCredentialType.PrivateKeyHex,
   } as Web3SigningCredential;
   const expressApp = express();
+  const keychainId = uuidv4();
   expressApp.use(bodyParser.json({ limit: "250mb" }));
   const server = http.createServer(expressApp);
   let addressInfo,
+    rpcApiHttpHost: string,
+    connector: PluginLedgerConnectorBesu,
+    rpcApiWsHost: string,
+    keychainPlugin: PluginKeychainMemory,
     address: string,
     port: number,
+    factory: PluginFactoryLedgerConnector,
     apiHost,
     configuration,
     api: BesuApi;
@@ -83,6 +89,29 @@ describe(testCase, () => {
 
   beforeAll(async () => {
     await besuTestLedger.start();
+    rpcApiHttpHost = await besuTestLedger.getRpcApiHttpHost();
+    expect(rpcApiHttpHost).toBeString();
+
+    rpcApiWsHost = await besuTestLedger.getRpcApiWsHost();
+    expect(rpcApiWsHost).toBeString();
+    keychainPlugin = new PluginKeychainMemory({
+      instanceId: uuidv4(),
+      keychainId,
+      // pre-provision keychain with mock backend holding the private key of the
+      // test account that we'll reference while sending requests with the
+      // signing credential pointing to this keychain entry.
+      backend: new Map([
+        [TestTokenJSON.contractName, JSON.stringify(TestTokenJSON)],
+      ]),
+      logLevel,
+    });
+    connector = await factory.create({
+      rpcApiHttpHost,
+      rpcApiWsHost,
+      logLevel,
+      instanceId: connectorId,
+      pluginRegistry: new PluginRegistry({ plugins: [keychainPlugin] }),
+    });
 
     const listenOptions: IListenOptions = {
       hostname: "0.0.0.0",
@@ -97,38 +126,12 @@ describe(testCase, () => {
   });
 
   test(testCase, async () => {
-    const rpcApiHttpHost = await besuTestLedger.getRpcApiHttpHost();
-    const rpcApiWsHost = await besuTestLedger.getRpcApiWsHost();
-    const keychainId = uuidv4();
-    const keychainPlugin = new PluginKeychainMemory({
-      instanceId: uuidv4(),
-      keychainId,
-      // pre-provision keychain with mock backend holding the private key of the
-      // test account that we'll reference while sending requests with the
-      // signing credential pointing to this keychain entry.
-      backend: new Map([
-        [TestTokenJSON.contractName, JSON.stringify(TestTokenJSON)],
-      ]),
-      logLevel,
-    });
-
     keychainPlugin.set(
       HashTimeLockJSON.contractName,
       JSON.stringify(HashTimeLockJSON),
     );
-    const factory = new PluginFactoryLedgerConnector({
-      pluginImportType: PluginImportType.Local,
-    });
 
     const pluginRegistry = new PluginRegistry({});
-    const connector: PluginLedgerConnectorBesu = await factory.create({
-      rpcApiHttpHost,
-      rpcApiWsHost,
-      logLevel,
-      instanceId: connectorId,
-      pluginRegistry: new PluginRegistry({ plugins: [keychainPlugin] }),
-    });
-
     pluginRegistry.add(connector);
     const pluginOptions: IPluginHtlcEthBesuErc20Options = {
       instanceId: uuidv4(),
@@ -224,37 +227,12 @@ describe(testCase, () => {
   });
 
   test("Test new invalid contract with 0 inputAmount token for HTLC", async () => {
-    const rpcApiHttpHost = await besuTestLedger.getRpcApiHttpHost();
-    const rpcApiWsHost = await besuTestLedger.getRpcApiWsHost();
-    const keychainId = uuidv4();
-    const keychainPlugin = new PluginKeychainMemory({
-      instanceId: uuidv4(),
-      keychainId,
-      // pre-provision keychain with mock backend holding the private key of the
-      // test account that we'll reference while sending requests with the
-      // signing credential pointing to this keychain entry.
-      backend: new Map([
-        [TestTokenJSON.contractName, JSON.stringify(TestTokenJSON)],
-      ]),
-      logLevel,
-    });
     keychainPlugin.set(
       HashTimeLockJSON.contractName,
       JSON.stringify(HashTimeLockJSON),
     );
-    const factory = new PluginFactoryLedgerConnector({
-      pluginImportType: PluginImportType.Local,
-    });
 
     const pluginRegistry = new PluginRegistry({});
-    const connector: PluginLedgerConnectorBesu = await factory.create({
-      rpcApiHttpHost,
-      rpcApiWsHost,
-      logLevel,
-      instanceId: connectorId,
-      pluginRegistry: new PluginRegistry({ plugins: [keychainPlugin] }),
-    });
-
     pluginRegistry.add(connector);
     const pluginOptions: IPluginHtlcEthBesuErc20Options = {
       instanceId: uuidv4(),
