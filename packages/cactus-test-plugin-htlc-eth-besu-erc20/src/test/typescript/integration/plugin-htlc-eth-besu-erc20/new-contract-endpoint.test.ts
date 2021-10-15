@@ -105,6 +105,9 @@ describe(testCase, () => {
       ]),
       logLevel,
     });
+    factory = new PluginFactoryLedgerConnector({
+      pluginImportType: PluginImportType.Local,
+    });
     connector = await factory.create({
       rpcApiHttpHost,
       rpcApiWsHost,
