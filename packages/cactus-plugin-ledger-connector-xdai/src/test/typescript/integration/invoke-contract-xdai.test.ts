@@ -38,7 +38,6 @@ describe(testCase, () => {
 
   beforeAll(async () => {
     xdaiTestLedger = new OpenEthereumTestLedger({});
-    await xdaiTestLedger.start();
   });
 
   afterAll(async () => {

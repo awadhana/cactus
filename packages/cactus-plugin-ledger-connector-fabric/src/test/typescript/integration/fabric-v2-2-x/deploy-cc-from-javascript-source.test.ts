@@ -3,8 +3,6 @@ import http from "http";
 import fs from "fs-extra";
 import path from "path";
 import "jest-extended";
-import test, { Test } from "tape-promise/tape";
-
 import { v4 as uuidv4 } from "uuid";
 
 import express from "express";
@@ -27,6 +25,7 @@ import { PluginRegistry } from "@hyperledger/cactus-core";
 import {
   ChainCodeProgrammingLanguage,
   DefaultEventHandlerStrategy,
+  DeploymentTargetOrganization,
   FabricContractInvocationType,
   FileBase64,
   PluginLedgerConnectorFabric,
@@ -41,46 +40,61 @@ import { PluginKeychainMemory } from "@hyperledger/cactus-plugin-keychain-memory
 import { Configuration } from "@hyperledger/cactus-core-api";
 
 const testCase = "deploys Fabric 2.x contract from javascript source";
-const logLevel: LogLevelDesc = "TRACE";
 
-test("BEFORE " + testCase, async () => {
-  const pruning = pruneDockerAllIfGithubAction({ logLevel });
-  await expect(pruning).resolves.toBeTruthy();
-});
+describe(testCase, () => {
+  const logLevel: LogLevelDesc = "TRACE";
+  const channelId = "mychannel";
+  const channelName = channelId;
+  const expressApp = express();
+  expressApp.use(bodyParser.json({ limit: "250mb" }));
+  const server = http.createServer(expressApp);
+  const ledger = new FabricTestLedgerV1({
+    emitContainerLogs: true,
+    publishAllPorts: true,
+    // imageName: "faio2x",
+    // imageVersion: "latest",
+    imageName: "ghcr.io/hyperledger/cactus-fabric2-all-in-one",
+    imageVersion: "2021-09-02--fix-876-supervisord-retries",
+    envVars: new Map([["FABRIC_VERSION", "2.2.0"]]),
+    logLevel,
+  });
+  // This is the directory structure of the Fabirc 2.x CLI container (fabric-tools image)
+  // const orgCfgDir = "/fabric-samples/test-network/organizations/";
+  const orgCfgDir =
+    "/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/";
+  let addressInfo,
+    port: number,
+    apiUrl,
+    config,
+    apiClient: FabricApi,
+    keychainEntryKey: string,
+    keychainPlugin: PluginKeychainMemory,
+    pluginRegistry: PluginRegistry,
+    plugin: PluginLedgerConnectorFabric,
+    pluginOptions: IPluginLedgerConnectorFabricOptions,
+    connectionProfile: any,
+    keychainId: string,
+    org1Env: DeploymentTargetOrganization;
 
-// Skipping due to test being flaky, see https://github.com/hyperledger/cactus/issues/1471
-test.skip(testCase, async (t: Test) => {
-  test(testCase, async (t: Test) => {
-    t.comment("I'm just here for the error of no t in the method");
+  afterAll(async () => {
+    await Containers.logDiagnostics({ logLevel });
+  });
 
-    const channelId = "mychannel";
-    const channelName = channelId;
+  afterAll(async () => {
+    await ledger.stop();
+    await ledger.destroy();
+  });
+  afterAll(async () => {
+    const pruning = pruneDockerAllIfGithubAction({ logLevel });
+    await expect(pruning).resolves.toBeTruthy();
+  });
+  beforeAll(async () => {
+    const pruning = pruneDockerAllIfGithubAction({ logLevel });
+    await expect(pruning).resolves.toBeTruthy();
+  });
 
-    test.onFailure(async () => {
-      await Containers.logDiagnostics({ logLevel });
-    });
-
-    const ledger = new FabricTestLedgerV1({
-      emitContainerLogs: true,
-      publishAllPorts: true,
-      // imageName: "faio2x",
-      // imageVersion: "latest",
-      imageName: "ghcr.io/hyperledger/cactus-fabric2-all-in-one",
-      imageVersion: "2021-09-02--fix-876-supervisord-retries",
-      envVars: new Map([["FABRIC_VERSION", "2.2.0"]]),
-      logLevel,
-    });
-    const tearDown = async () => {
-      await ledger.stop();
-      await ledger.destroy();
-      await pruneDockerAllIfGithubAction({ logLevel });
-    };
-
-    test.onFinish(tearDown);
-    await ledger.start();
-
-    const connectionProfile = await ledger.getConnectionProfileOrg1();
-    expect(connectionProfile).toBeTruthy();
+  beforeAll(async () => {
+    connectionProfile = await ledger.getConnectionProfileOrg1();
 
     const enrollAdminOut = await ledger.enrollAdmin();
     const adminWallet = enrollAdminOut[1];
@@ -88,11 +102,11 @@ test.skip(testCase, async (t: Test) => {
     const sshConfig = await ledger.getSshConfig();
 
     const keychainInstanceId = uuidv4();
-    const keychainId = uuidv4();
-    const keychainEntryKey = "user2";
+    keychainId = uuidv4();
+    keychainEntryKey = "user2";
     const keychainEntryValue = JSON.stringify(userIdentity);
 
-    const keychainPlugin = new PluginKeychainMemory({
+    keychainPlugin = new PluginKeychainMemory({
       instanceId: keychainInstanceId,
       keychainId,
       logLevel,
@@ -102,20 +116,33 @@ test.skip(testCase, async (t: Test) => {
       ]),
     });
 
-    const pluginRegistry = new PluginRegistry({ plugins: [keychainPlugin] });
+    pluginRegistry = new PluginRegistry({ plugins: [keychainPlugin] });
 
     const discoveryOptions: DiscoveryOptions = {
       enabled: true,
       asLocalhost: true,
     };
 
-    // This is the directory structure of the Fabirc 2.x CLI container (fabric-tools image)
-    // const orgCfgDir = "/fabric-samples/test-network/organizations/";
-    const orgCfgDir =
-      "/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations/";
+    pluginOptions = {
+      instanceId: uuidv4(),
+      dockerBinary: "/usr/local/bin/docker",
+      peerBinary: "/fabric-samples/bin/peer",
+      goBinary: "/usr/local/go/bin/go",
+      pluginRegistry,
+      cliContainerEnv: (org1Env as unknown) as NodeJS.ProcessEnv,
+      sshConfig,
+      logLevel,
+      connectionProfile,
+      discoveryOptions,
+      eventHandlerOptions: {
+        strategy: DefaultEventHandlerStrategy.NetworkScopeAllfortx,
+        commitTimeout: 300,
+      },
+    };
+    plugin = new PluginLedgerConnectorFabric(pluginOptions);
 
     // these below mirror how the fabric-samples sets up the configuration
-    const org1Env = {
+    org1Env = {
       CORE_LOGGING_LEVEL: "debug",
       FABRIC_LOGGING_SPEC: "debug",
       CORE_PEER_LOCALMSPID: "Org1MSP",
@@ -128,7 +155,23 @@ test.skip(testCase, async (t: Test) => {
       CORE_PEER_MSPCONFIGPATH: `${orgCfgDir}peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp`,
       CORE_PEER_ADDRESS: "peer0.org1.example.com:7051",
       ORDERER_TLS_ROOTCERT_FILE: `${orgCfgDir}ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem`,
+    } as DeploymentTargetOrganization;
+    const listenOptions: IListenOptions = {
+      hostname: "localhost",
+      port: 0,
+      server,
     };
+    addressInfo = (await Servers.listen(listenOptions)) as AddressInfo;
+    ({ port } = addressInfo);
+    apiUrl = `http://localhost:${port}`;
+
+    config = new Configuration({ basePath: apiUrl });
+
+    apiClient = new FabricApi(config);
+  });
+
+  test(testCase, async () => {
+    expect(connectionProfile).toBeTruthy();
 
     // these below mirror how the fabric-samples sets up the configuration
     const org2Env = {
@@ -146,43 +189,8 @@ test.skip(testCase, async (t: Test) => {
       ORDERER_TLS_ROOTCERT_FILE: `${orgCfgDir}ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem`,
     };
 
-    const pluginOptions: IPluginLedgerConnectorFabricOptions = {
-      instanceId: uuidv4(),
-      dockerBinary: "/usr/local/bin/docker",
-      peerBinary: "/fabric-samples/bin/peer",
-      goBinary: "/usr/local/go/bin/go",
-      pluginRegistry,
-      cliContainerEnv: org1Env,
-      sshConfig,
-      logLevel,
-      connectionProfile,
-      discoveryOptions,
-      eventHandlerOptions: {
-        strategy: DefaultEventHandlerStrategy.NetworkScopeAllfortx,
-        commitTimeout: 300,
-      },
-    };
-    const plugin = new PluginLedgerConnectorFabric(pluginOptions);
-
-    const expressApp = express();
-    expressApp.use(bodyParser.json({ limit: "250mb" }));
-    const server = http.createServer(expressApp);
-    const listenOptions: IListenOptions = {
-      hostname: "localhost",
-      port: 0,
-      server,
-    };
-    const addressInfo = (await Servers.listen(listenOptions)) as AddressInfo;
-    const { port } = addressInfo;
-    test.onFinish(async () => await Servers.shutdown(server));
-
     await plugin.getOrCreateWebServices();
     await plugin.registerWebServices(expressApp);
-    const apiUrl = `http://localhost:${port}`;
-
-    const config = new Configuration({ basePath: apiUrl });
-
-    const apiClient = new FabricApi(config);
 
     const contractName = "basic-asset-transfer-2";
 
@@ -306,8 +314,7 @@ test.skip(testCase, async (t: Test) => {
       },
     });
     expect(createRes).toBeTruthy();
-    expect(createRes.status > 199).toBe(true);
-    expect(createRes.status < 300).toBe(true);
+    expect(createRes.status).toBeWithin(199, 300);
 
     const getRes = await apiClient.runTransactionV1({
       contractName,
@@ -323,7 +330,7 @@ test.skip(testCase, async (t: Test) => {
     expect(getRes).toBeTruthy();
     expect(getRes.data).toBeTruthy();
     expect(getRes.data.functionOutput).toBeTruthy();
-    expect(getRes.status > 199 && createRes.status < 300).toBe(true);
+    expect(getRes.status).toBeWithin(199, 300);
 
     const asset = JSON.parse(getRes.data.functionOutput);
 
@@ -337,5 +344,4 @@ test.skip(testCase, async (t: Test) => {
     expect(asset.Owner).toBeTruthy();
     expect(asset.Owner).toEqual(assetOwner);
   });
-  t.end();
 });
