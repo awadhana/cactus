@@ -28,6 +28,7 @@ import {
   DeploymentTargetOrganization,
   FabricContractInvocationType,
   FileBase64,
+  ConnectionProfile,
   PluginLedgerConnectorFabric,
 } from "../../../../main/typescript/public-api";
 
@@ -72,7 +73,7 @@ describe(testCase, () => {
     pluginRegistry: PluginRegistry,
     plugin: PluginLedgerConnectorFabric,
     pluginOptions: IPluginLedgerConnectorFabricOptions,
-    connectionProfile,
+    connectionProfile: ConnectionProfile,
     keychainId: string,
     org1Env: DeploymentTargetOrganization;
 
@@ -94,6 +95,7 @@ describe(testCase, () => {
   });
 
   beforeAll(async () => {
+    await ledger.start();
     connectionProfile = await ledger.getConnectionProfileOrg1();
 
     const enrollAdminOut = await ledger.enrollAdmin();

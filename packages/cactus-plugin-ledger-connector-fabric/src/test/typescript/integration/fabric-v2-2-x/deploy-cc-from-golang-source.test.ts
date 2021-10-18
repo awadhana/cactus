@@ -28,6 +28,7 @@ import {
   DeploymentTargetOrganization,
   FabricContractInvocationType,
   PluginLedgerConnectorFabric,
+  ConnectionProfile,
 } from "../../../../main/typescript/public-api";
 
 import { DefaultApi as FabricApi } from "../../../../main/typescript/public-api";
@@ -70,7 +71,7 @@ describe(testCase, () => {
     pluginRegistry: PluginRegistry,
     plugin: PluginLedgerConnectorFabric,
     pluginOptions: IPluginLedgerConnectorFabricOptions,
-    connectionProfile,
+    connectionProfile: ConnectionProfile,
     keychainId: string,
     org1Env: DeploymentTargetOrganization;
 
@@ -91,6 +92,7 @@ describe(testCase, () => {
     await expect(pruning).resolves.toBeTruthy();
   });
   beforeAll(async () => {
+    await ledger.start();
     const enrollAdminOut = await ledger.enrollAdmin();
     const adminWallet = enrollAdminOut[1];
     const [userIdentity] = await ledger.enrollUser(adminWallet);

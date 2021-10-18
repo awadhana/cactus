@@ -16,7 +16,7 @@ import Web3 from "web3";
 import { PluginImportType } from "@hyperledger/cactus-core-api";
 import { GetTransactionV1Request } from "../../../../main/typescript/generated/openapi/typescript-axios/api";
 
-const testCase = "";
+const testCase = "PluginLedgerConnectorBesu";
 describe(testCase, () => {
   const logLevel: LogLevelDesc = "TRACE";
   const besuTestLedger = new BesuTestLedger();
