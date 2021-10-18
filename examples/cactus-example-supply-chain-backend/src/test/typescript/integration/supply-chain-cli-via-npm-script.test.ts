@@ -51,9 +51,6 @@ describe(testCase, () => {
       });
     });
 
-    await t.doesNotReject(
-      childProcessPromise,
-      "childProcessPromise resolves OK",
-    );
+    await expect(childProcessPromise).toResolve();
   });
 });
