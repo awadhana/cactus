@@ -1,5 +1,4 @@
 import "jest-extended";
-import test, { Test } from "tape-promise/tape";
 import { v4 as uuidv4 } from "uuid";
 import { createServer } from "http";
 import KeyEncoder from "key-encoder";

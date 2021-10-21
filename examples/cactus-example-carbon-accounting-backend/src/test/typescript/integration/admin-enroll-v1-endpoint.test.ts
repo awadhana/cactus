@@ -1,7 +1,6 @@
 import { AddressInfo } from "net";
 import expressJwt from "express-jwt";
 import "jest-extended";
-import test, { Test } from "tape-promise/tape";
 import { v4 as uuidv4 } from "uuid";
 import { JWK, JWT } from "jose";
 import { StatusCodes } from "http-status-codes";
@@ -43,7 +42,7 @@ test("BEFORE " + testCase, async () => {
   await expect(pruning).resolves.toBeTruthy();
 });
 
-test(testCase, async (t: Test) => {
+test(testCase, async () => {
   const jwtKeyPair = await JWK.generate("RSA", 4096);
   const jwtPublicKey = jwtKeyPair.toPEM(false);
   const expressJwtOptions: expressJwt.Options = {
@@ -98,6 +97,12 @@ test(testCase, async (t: Test) => {
   test.onFinish(async () => {
     await carbonAccountingApp.stop();
     await pruneDockerAllIfGithubAction({ logLevel });
+  });
+
+  afterAll(async () => {
+    await carbonAccountingApp.stop();
+    const pruning = pruneDockerAllIfGithubAction({ logLevel });
+    await expect(pruning).resolves.toBeTruthy();
   });
 
   try {
@@ -160,5 +165,4 @@ test(testCase, async (t: Test) => {
     expect(out.response.data.data).not.toBeTruthy();
     expect(out.response.data.success).not.toBeTruthy();
   }
-  t.end();
 });

@@ -71,7 +71,10 @@ describe(testCase, () => {
     connectionProfile: ConnectionProfile,
     keychainId: string,
     org1Env: DeploymentTargetOrganization;
-
+  beforeAll(async () => {
+    const pruning = pruneDockerAllIfGithubAction({ logLevel });
+    await expect(pruning).resolves.toBeTruthy();
+  });
   afterAll(async () => await Servers.shutdown(server));
   afterAll(async () => {
     await ledger.stop();
@@ -81,10 +84,6 @@ describe(testCase, () => {
     await Containers.logDiagnostics({ logLevel });
   });
   afterAll(async () => {
-    const pruning = pruneDockerAllIfGithubAction({ logLevel });
-    await expect(pruning).resolves.toBeTruthy();
-  });
-  beforeAll(async () => {
     const pruning = pruneDockerAllIfGithubAction({ logLevel });
     await expect(pruning).resolves.toBeTruthy();
   });
