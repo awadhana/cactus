@@ -44,9 +44,21 @@ describe(testCase, () => {
 
   const configService = new ConfigService();
   const cactusApiServerOptions: ICactusApiServerOptions = configService.newExampleConfig();
+  cactusApiServerOptions.authorizationProtocol = AuthorizationProtocol.NONE;
+  cactusApiServerOptions.configFile = "";
+  cactusApiServerOptions.apiCorsDomainCsv = "*";
+  cactusApiServerOptions.apiTlsEnabled = false;
+  cactusApiServerOptions.apiPort = 0;
   const config = configService.newExampleConfigConvict(cactusApiServerOptions);
   const plugins: ICactusPlugin[] = [];
   const pluginRegistry = new PluginRegistry({ plugins });
+  const contractName = "HelloWorld";
+  let addressInfo,
+    protocol,
+    basePath,
+    configuration,
+    rpcApiHttpHost: string,
+    client: DefaultApi;
 
   const apiServer = new ApiServer({
     config: config.getProperties(),
@@ -66,22 +78,20 @@ describe(testCase, () => {
     await expect(pruning).resolves.toBeTruthy();
   });
 
-  // beforeAll(async () => {
-  // });
+  beforeAll(async () => {
+    await ledger.start();
+    rpcApiHttpHost = await ledger.getRpcApiHttpHost();
+    const httpServer = apiServer.getHttpServerApi();
+    addressInfo = httpServer?.address() as AddressInfo;
+    protocol = config.get("apiTlsEnabled") ? "https:" : "http:";
+    basePath = `${protocol}//${addressInfo.address}:${addressInfo.port}`;
+    configuration = new Configuration({ basePath });
+    client = new DefaultApi(configuration);
+  });
 
   test(testCase, async () => {
-    await ledger.start();
-
-    const contractName = "HelloWorld";
     // 1. Instantiate a ledger object
     // 3. Gather parameteres needed to run an embedded ApiServer which can connect to/interact with said ledger
-    const rpcApiHttpHost = await ledger.getRpcApiHttpHost();
-    cactusApiServerOptions.authorizationProtocol = AuthorizationProtocol.NONE;
-    cactusApiServerOptions.configFile = "";
-    cactusApiServerOptions.apiCorsDomainCsv = "*";
-    cactusApiServerOptions.apiTlsEnabled = false;
-    cactusApiServerOptions.apiPort = 0;
-
     const kvStoragePlugin = new PluginKeychainMemory({
       backend: new Map(),
       instanceId: uuidV4(),
@@ -119,17 +129,10 @@ describe(testCase, () => {
     const [firstHighNetWorthAccount] = highNetWorthAccounts;
 
     // 6. Instantiate the SDK dynamically with whatever port the API server ended up bound to (port 0)
-    const httpServer = apiServer.getHttpServerApi();
-    const addressInfo = httpServer?.address() as AddressInfo;
     log.debug(`AddressInfo: `, addressInfo);
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-expect-error
-    const protocol = config.get("apiTlsEnabled") ? "https:" : "http:";
-    const basePath = `${protocol}//${addressInfo.address}:${addressInfo.port}`;
     log.debug(`SDK base path: %s`, basePath);
-
-    const configuration = new Configuration({ basePath });
-    const client = new DefaultApi(configuration);
 
     // 7. Assemble request to invoke the deploy contract method of the quorum ledger connector plugin via the REST API
     const req: DeployContractSolidityBytecodeV1Request = {
@@ -149,104 +152,104 @@ describe(testCase, () => {
 
     expect(res).toBeTruthy();
     expect(res.status).toBeWithin(199, 300);
+  });
 
-    test("Invoke contract via SDK ApiClient object", async () => {
-      const web3 = new Web3(rpcApiHttpHost);
-      const testEthAccount = web3.eth.accounts.create(uuidV4());
+  test("Invoke contract via SDK ApiClient object", async () => {
+    const web3 = new Web3(rpcApiHttpHost);
+    const testEthAccount = web3.eth.accounts.create(uuidV4());
 
-      const res1 = await client.runTransactionV1({
-        web3SigningCredential: {
-          ethAccount: firstHighNetWorthAccount,
-          secret: "",
-          type: Web3SigningCredentialType.GethKeychainPassword,
-        },
-        transactionConfig: {
-          from: firstHighNetWorthAccount,
-          to: testEthAccount.address,
-          value: 10e9,
-        },
-      });
-      expect(res1).toBeTruthy();
-      expect(res1.status).toBeWithin(199, 300);
-
-      const balance = await web3.eth.getBalance(testEthAccount.address);
-      expect(balance).toBeTruthy();
-      expect(parseInt(balance, 10)).toEqual(10e9);
-
-      const sayHelloRes = await client.invokeContractV1({
-        contractName,
-        invocationType: EthContractInvocationType.Call,
-        methodName: "sayHello",
-        params: [],
-        signingCredential: {
-          type: Web3SigningCredentialType.None,
-        },
-        keychainId: kvStoragePlugin.getKeychainId(),
-      });
-      expect(sayHelloRes).toBeTruthy();
-      expect(sayHelloRes.status).toBeWithin(199, 300);
-      expect(sayHelloRes.data).toBeTruthy();
-      expect(sayHelloRes.data.callOutput).toBeTruthy();
-      expect(typeof sayHelloRes.data.callOutput).toBeString();
-      expect(sayHelloRes.data.callOutput).toBe("Hello World");
-
-      const newName = `DrCactus${uuidV4()}`;
-      const setName1Res = await client.invokeContractV1({
-        contractName,
-        invocationType: EthContractInvocationType.Send,
-        methodName: "setName",
-        params: [newName],
-        gas: 1000000,
-        signingCredential: {
-          ethAccount: testEthAccount.address,
-          secret: testEthAccount.privateKey,
-          type: Web3SigningCredentialType.PrivateKeyHex,
-        },
-        keychainId: kvStoragePlugin.getKeychainId(),
-      });
-      expect(setName1Res).toBeTruthy();
-      expect(setName1Res).toBeTruthy();
-      expect(setName1Res.status).toBeWithin(199, 300);
-      expect(setName1Res.data).toBeTruthy();
-
-      const getName1Res = await client.invokeContractV1({
-        contractName,
-        invocationType: EthContractInvocationType.Call,
-        methodName: "getName",
-        params: [],
-        gas: 1000000,
-        signingCredential: {
-          ethAccount: testEthAccount.address,
-          secret: testEthAccount.privateKey,
-          type: Web3SigningCredentialType.PrivateKeyHex,
-        },
-        keychainId: kvStoragePlugin.getKeychainId(),
-      });
-      expect(getName1Res).toBeTruthy();
-      expect(getName1Res.status).toBeWithin(199, 300);
-      expect(getName1Res.data).toBeTruthy();
-      expect(getName1Res.data.callOutput).toBeTruthy();
-      expect(getName1Res.data.callOutput).toBeString();
-      expect(getName1Res.data.callOutput).toEqual(newName);
-
-      const getName2Res = await client.invokeContractV1({
-        contractName,
-        invocationType: EthContractInvocationType.Send,
-        methodName: "getName",
-        params: [],
-        gas: 1000000,
-        signingCredential: {
-          ethAccount: testEthAccount.address,
-          secret: testEthAccount.privateKey,
-          type: Web3SigningCredentialType.PrivateKeyHex,
-        },
-        keychainId: kvStoragePlugin.getKeychainId(),
-      });
-
-      expect(getName2Res).toBeTruthy();
-      expect(getName2Res.status).toBeWithin(199, 300);
-      expect(getName2Res.data).toBeTruthy();
-      expect(getName2Res.data.callOutput).not.toBeTruthy();
+    const res1 = await client.runTransactionV1({
+      web3SigningCredential: {
+        ethAccount: firstHighNetWorthAccount,
+        secret: "",
+        type: Web3SigningCredentialType.GethKeychainPassword,
+      },
+      transactionConfig: {
+        from: firstHighNetWorthAccount,
+        to: testEthAccount.address,
+        value: 10e9,
+      },
     });
+    expect(res1).toBeTruthy();
+    expect(res1.status).toBeWithin(199, 300);
+
+    const balance = await web3.eth.getBalance(testEthAccount.address);
+    expect(balance).toBeTruthy();
+    expect(parseInt(balance, 10)).toEqual(10e9);
+
+    const sayHelloRes = await client.invokeContractV1({
+      contractName,
+      invocationType: EthContractInvocationType.Call,
+      methodName: "sayHello",
+      params: [],
+      signingCredential: {
+        type: Web3SigningCredentialType.None,
+      },
+      keychainId: kvStoragePlugin.getKeychainId(),
+    });
+    expect(sayHelloRes).toBeTruthy();
+    expect(sayHelloRes.status).toBeWithin(199, 300);
+    expect(sayHelloRes.data).toBeTruthy();
+    expect(sayHelloRes.data.callOutput).toBeTruthy();
+    expect(typeof sayHelloRes.data.callOutput).toBeString();
+    expect(sayHelloRes.data.callOutput).toBe("Hello World");
+
+    const newName = `DrCactus${uuidV4()}`;
+    const setName1Res = await client.invokeContractV1({
+      contractName,
+      invocationType: EthContractInvocationType.Send,
+      methodName: "setName",
+      params: [newName],
+      gas: 1000000,
+      signingCredential: {
+        ethAccount: testEthAccount.address,
+        secret: testEthAccount.privateKey,
+        type: Web3SigningCredentialType.PrivateKeyHex,
+      },
+      keychainId: kvStoragePlugin.getKeychainId(),
+    });
+    expect(setName1Res).toBeTruthy();
+    expect(setName1Res).toBeTruthy();
+    expect(setName1Res.status).toBeWithin(199, 300);
+    expect(setName1Res.data).toBeTruthy();
+
+    const getName1Res = await client.invokeContractV1({
+      contractName,
+      invocationType: EthContractInvocationType.Call,
+      methodName: "getName",
+      params: [],
+      gas: 1000000,
+      signingCredential: {
+        ethAccount: testEthAccount.address,
+        secret: testEthAccount.privateKey,
+        type: Web3SigningCredentialType.PrivateKeyHex,
+      },
+      keychainId: kvStoragePlugin.getKeychainId(),
+    });
+    expect(getName1Res).toBeTruthy();
+    expect(getName1Res.status).toBeWithin(199, 300);
+    expect(getName1Res.data).toBeTruthy();
+    expect(getName1Res.data.callOutput).toBeTruthy();
+    expect(getName1Res.data.callOutput).toBeString();
+    expect(getName1Res.data.callOutput).toEqual(newName);
+
+    const getName2Res = await client.invokeContractV1({
+      contractName,
+      invocationType: EthContractInvocationType.Send,
+      methodName: "getName",
+      params: [],
+      gas: 1000000,
+      signingCredential: {
+        ethAccount: testEthAccount.address,
+        secret: testEthAccount.privateKey,
+        type: Web3SigningCredentialType.PrivateKeyHex,
+      },
+      keychainId: kvStoragePlugin.getKeychainId(),
+    });
+
+    expect(getName2Res).toBeTruthy();
+    expect(getName2Res.status).toBeWithin(199, 300);
+    expect(getName2Res.data).toBeTruthy();
+    expect(getName2Res.data.callOutput).not.toBeTruthy();
   });
 });
