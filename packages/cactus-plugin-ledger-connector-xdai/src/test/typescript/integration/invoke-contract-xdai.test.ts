@@ -74,6 +74,7 @@ describe(testCase, () => {
       pluginImportType: PluginImportType.Local,
     });
     connector = await factory.create({
+      logLevel,
       rpcApiHttpHost,
       instanceId: uuidv4(),
       pluginRegistry: new PluginRegistry({ plugins: [keychainPlugin] }),
@@ -204,7 +205,7 @@ describe(testCase, () => {
       });
       fail("invalid nonce should have thrown");
     } catch (error) {
-      expect(error.message).toContain("Nonce too low");
+      expect(error.message).toContain("Transaction nonce is too low.");
     }
     const { callOutput: getNameOut } = await connector.invokeContract({
       contractName,
@@ -302,7 +303,9 @@ describe(testCase, () => {
       });
       fail("invalid nonce should have thrown");
     } catch (error) {
-      expect(error.message).toContain("Nonce too low");
+      expect(error.message).toContain(
+        "Transaction with the same hash was already imported",
+      );
     }
 
     const { callOutput: getNameOut } = await connector.invokeContract({
