@@ -3,6 +3,7 @@
 // import "jest-extended";
 // import {
 //   QuorumTestLedger,
+//   IQuorumGenesisOptions,
 //   IAccount,
 //   pruneDockerAllIfGithubAction,
 // } from "@hyperledger/cactus-test-tooling";
@@ -59,6 +60,10 @@
 //     rpcApiHttpHost: string,
 //     client: DefaultApi;
 
+//   const apiServer = new ApiServer({
+//     config: config.getProperties(),
+//     pluginRegistry,
+//   });
 //   afterAll(async () => await apiServer.shutdown());
 //   beforeAll(async () => {
 //     const pruning = pruneDockerAllIfGithubAction({ logLevel });
@@ -105,25 +110,15 @@
 //     });
 //     plugins.push(ledgerConnectorQuorum);
 
-//     apiServer = new ApiServer({
-//       config: config.getProperties(),
-//       pluginRegistry,
-//     });
-
-//     // Start the API server which now is connected to the quorum ledger
-//     apiServerStartOut = await apiServer.start();
+//     // 4. Start the API server which now is connected to the quorum ledger
+//     const apiServerStartOut = await apiServer.start();
 //     log.debug(`ApiServer.started OK:`, apiServerStartOut);
-//     const httpServer = apiServer.getHttpServerApi();
-//     addressInfo = httpServer?.address() as AddressInfo;
 
-//     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-//     // @ts-expect-error
-//     protocol = config.get("apiTlsEnabled") ? "https:" : "http:";
-//     basePath = `${protocol}//${addressInfo.address}:${addressInfo.port}`;
-//     configuration = new Configuration({ basePath });
-//     client = new DefaultApi(configuration);
-//     // Find a high net worth account in the genesis object of the quorum ledger
-//     quorumGenesisOptions = await ledger.getGenesisJsObject();
+//     // 5. Find a high net worth account in the genesis object of the quorum ledger
+//     const quorumGenesisOptions: IQuorumGenesisOptions = await ledger.getGenesisJsObject();
+//     expect(quorumGenesisOptions);
+//     expect(quorumGenesisOptions.alloc);
+
 //     const highNetWorthAccounts: string[] = Object.keys(
 //       quorumGenesisOptions.alloc,
 //     ).filter((address: string) => {
@@ -131,12 +126,7 @@
 //       const balance: number = parseInt(anAccount.balance, 10);
 //       return balance > 10e7;
 //     });
-//     [firstHighNetWorthAccount] = highNetWorthAccounts;
-//   });
-
-//   test(testCase, async () => {
-//     expect(quorumGenesisOptions);
-//     expect(quorumGenesisOptions.alloc);
+//     const [firstHighNetWorthAccount] = highNetWorthAccounts;
 
 //     // 6. Instantiate the SDK dynamically with whatever port the API server ended up bound to (port 0)
 //     log.debug(`AddressInfo: `, addressInfo);
@@ -147,6 +137,7 @@
 //     // 7. Assemble request to invoke the deploy contract method of the quorum ledger connector plugin via the REST API
 //     const req: DeployContractSolidityBytecodeV1Request = {
 //       contractName: HelloWorldContractJson.contractName,
+//       bytecode: HelloWorldContractJson.bytecode,
 //       web3SigningCredential: {
 //         ethAccount: firstHighNetWorthAccount,
 //         secret: "",
