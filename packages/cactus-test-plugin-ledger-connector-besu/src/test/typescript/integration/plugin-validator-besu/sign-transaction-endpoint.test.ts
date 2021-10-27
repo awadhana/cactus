@@ -42,12 +42,35 @@ const logLevel: LogLevelDesc = "TRACE";
 describe(testCase, () => {
   const besuTestLedger = new BesuTestLedger();
   const httpServer1 = createServer();
-  let addressInfo1,
+  let addressInfo1: AddressInfo,
     node1Host,
     rpcApiHttpHost: string,
     rpcApiWsHost: string,
     configuration: BesuApiClientOptions,
     api: BesuApiClient;
+  const configService = new ConfigService();
+  const keyEncoder: KeyEncoder = new KeyEncoder("secp256k1");
+  const keychainRef = uuidv4();
+  const { privateKey } = Secp256k1Keys.generateKeyPairsBuffer();
+  const keyHex = privateKey.toString("hex");
+  const keychainId = uuidv4();
+  const pem = keyEncoder.encodePrivate(keyHex, KeyFormat.Raw, KeyFormat.PEM);
+  const keychain = new PluginKeychainMemory({
+    backend: new Map([[keychainRef, pem]]),
+    keychainId,
+    logLevel,
+    instanceId: uuidv4(),
+  });
+  // 2. Instantiate plugin registry which will provide the web service plugin with the key value storage plugin
+  const pluginRegistry = new PluginRegistry({ plugins: [keychain] });
+
+  const apiServerOptions = configService.newExampleConfig();
+  const config = configService.newExampleConfigConvict(apiServerOptions);
+  const apiServer = new ApiServer({
+    httpServerApi: httpServer1,
+    config: config.getProperties(),
+    pluginRegistry,
+  });
 
   beforeAll(async () => {
     const pruning = pruneDockerAllIfGithubAction({ logLevel });
@@ -59,6 +82,9 @@ describe(testCase, () => {
     await besuTestLedger.destroy();
   });
 
+  // Make sure the API server is shut down when the testing if finished.
+  afterAll(async () => await apiServer.shutdown());
+
   afterAll(async () => {
     const pruning = pruneDockerAllIfGithubAction({ logLevel });
     await expect(pruning).resolves.toBeTruthy();
@@ -69,27 +95,22 @@ describe(testCase, () => {
     addressInfo1 = httpServer1.address() as AddressInfo;
     node1Host = `http://${addressInfo1.address}:${addressInfo1.port}`;
     configuration = new BesuApiClientOptions({ basePath: node1Host });
+    //Create the API Server object that we embed in this test
+
+    apiServerOptions.authorizationProtocol = AuthorizationProtocol.NONE;
+    apiServerOptions.configFile = "";
+    apiServerOptions.apiCorsDomainCsv = "*";
+    apiServerOptions.apiPort = addressInfo1.port;
+    apiServerOptions.cockpitPort = 0;
+    apiServerOptions.grpcPort = 0;
+    apiServerOptions.apiTlsEnabled = false;
+
     api = new BesuApiClient(configuration);
     rpcApiHttpHost = await besuTestLedger.getRpcApiHttpHost();
     rpcApiWsHost = await besuTestLedger.getRpcApiWsHost();
   });
 
   test(testCase, async () => {
-    const keyEncoder: KeyEncoder = new KeyEncoder("secp256k1");
-    const keychainId = uuidv4();
-    const keychainRef = uuidv4();
-
-    const { privateKey } = Secp256k1Keys.generateKeyPairsBuffer();
-    const keyHex = privateKey.toString("hex");
-    const pem = keyEncoder.encodePrivate(keyHex, KeyFormat.Raw, KeyFormat.PEM);
-
-    const keychain = new PluginKeychainMemory({
-      backend: new Map([[keychainRef, pem]]),
-      keychainId,
-      logLevel,
-      instanceId: uuidv4(),
-    });
-
     await new Promise((resolve, reject) => {
       httpServer1.once("error", reject);
       httpServer1.once("listening", resolve);
@@ -102,9 +123,6 @@ describe(testCase, () => {
     };
     const jsObjectSigner = new JsObjectSigner(jsObjectSignerOptions);
 
-    // 2. Instantiate plugin registry which will provide the web service plugin with the key value storage plugin
-    const pluginRegistry = new PluginRegistry({ plugins: [keychain] });
-
     // 3. Instantiate the web service consortium plugin
     const options: IPluginLedgerConnectorBesuOptions = {
       instanceId: uuidv4(),
@@ -115,28 +133,7 @@ describe(testCase, () => {
     };
     const pluginValidatorBesu = new PluginLedgerConnectorBesu(options);
 
-    // 4. Create the API Server object that we embed in this test
-    const configService = new ConfigService();
-    const apiServerOptions = configService.newExampleConfig();
-    apiServerOptions.authorizationProtocol = AuthorizationProtocol.NONE;
-    apiServerOptions.configFile = "";
-    apiServerOptions.apiCorsDomainCsv = "*";
-    apiServerOptions.apiPort = addressInfo1.port;
-    apiServerOptions.cockpitPort = 0;
-    apiServerOptions.grpcPort = 0;
-    apiServerOptions.apiTlsEnabled = false;
-    const config = configService.newExampleConfigConvict(apiServerOptions);
-
     pluginRegistry.add(pluginValidatorBesu);
-
-    const apiServer = new ApiServer({
-      httpServerApi: httpServer1,
-      config: config.getProperties(),
-      pluginRegistry,
-    });
-
-    // 5. make sure the API server is shut down when the testing if finished.
-    test.onFinish(() => apiServer.shutdown());
 
     // 6. Start the API server which is now listening on port A and it's healthcheck works through the main SDK
     await apiServer.start();
