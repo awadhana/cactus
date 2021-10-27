@@ -58,11 +58,20 @@ describe(testCase, () => {
     basePath: string,
     configuration,
     rpcApiHttpHost: string,
-    client: DefaultApi;
+    client: DefaultApi,
+    quorumGenesisOptions: IQuorumGenesisOptions,
+    firstHighNetWorthAccount: string;
 
   const apiServer = new ApiServer({
     config: config.getProperties(),
     pluginRegistry,
+  });
+  // Instantiate a ledger object
+  // Gather parameteres needed to run an embedded ApiServer which can connect to/interact with said ledger
+  const kvStoragePlugin = new PluginKeychainMemory({
+    backend: new Map(),
+    instanceId: uuidV4(),
+    keychainId: uuidV4(),
   });
   afterAll(async () => await apiServer.shutdown());
   beforeAll(async () => {
@@ -89,16 +98,19 @@ describe(testCase, () => {
     basePath = `${protocol}//${addressInfo.address}:${addressInfo.port}`;
     configuration = new Configuration({ basePath });
     client = new DefaultApi(configuration);
+    // Find a high net worth account in the genesis object of the quorum ledger
+    quorumGenesisOptions = await ledger.getGenesisJsObject();
+    const highNetWorthAccounts: string[] = Object.keys(
+      quorumGenesisOptions.alloc,
+    ).filter((address: string) => {
+      const anAccount: IAccount = quorumGenesisOptions.alloc[address];
+      const balance: number = parseInt(anAccount.balance, 10);
+      return balance > 10e7;
+    });
+    [firstHighNetWorthAccount] = highNetWorthAccounts;
   });
 
   test(testCase, async () => {
-    // 1. Instantiate a ledger object
-    // 3. Gather parameteres needed to run an embedded ApiServer which can connect to/interact with said ledger
-    const kvStoragePlugin = new PluginKeychainMemory({
-      backend: new Map(),
-      instanceId: uuidV4(),
-      keychainId: uuidV4(),
-    });
     kvStoragePlugin.set(
       HelloWorldContractJson.contractName,
       JSON.stringify(HelloWorldContractJson),
@@ -116,19 +128,8 @@ describe(testCase, () => {
     const apiServerStartOut = await apiServer.start();
     log.debug(`ApiServer.started OK:`, apiServerStartOut);
 
-    // 5. Find a high net worth account in the genesis object of the quorum ledger
-    const quorumGenesisOptions: IQuorumGenesisOptions = await ledger.getGenesisJsObject();
     expect(quorumGenesisOptions);
     expect(quorumGenesisOptions.alloc);
-
-    const highNetWorthAccounts: string[] = Object.keys(
-      quorumGenesisOptions.alloc,
-    ).filter((address: string) => {
-      const anAccount: IAccount = quorumGenesisOptions.alloc[address];
-      const balance: number = parseInt(anAccount.balance, 10);
-      return balance > 10e7;
-    });
-    const [firstHighNetWorthAccount] = highNetWorthAccounts;
 
     // 6. Instantiate the SDK dynamically with whatever port the API server ended up bound to (port 0)
     log.debug(`AddressInfo: `, addressInfo);
