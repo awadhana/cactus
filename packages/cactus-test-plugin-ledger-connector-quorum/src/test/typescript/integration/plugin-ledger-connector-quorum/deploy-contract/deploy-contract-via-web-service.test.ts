@@ -53,9 +53,9 @@ describe(testCase, () => {
   const plugins: ICactusPlugin[] = [];
   const pluginRegistry = new PluginRegistry({ plugins });
   const contractName = "HelloWorld";
-  let addressInfo,
+  let addressInfo: AddressInfo,
     protocol,
-    basePath,
+    basePath: string,
     configuration,
     rpcApiHttpHost: string,
     client: DefaultApi;
@@ -83,6 +83,8 @@ describe(testCase, () => {
     rpcApiHttpHost = await ledger.getRpcApiHttpHost();
     const httpServer = apiServer.getHttpServerApi();
     addressInfo = httpServer?.address() as AddressInfo;
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-expect-error
     protocol = config.get("apiTlsEnabled") ? "https:" : "http:";
     basePath = `${protocol}//${addressInfo.address}:${addressInfo.port}`;
     configuration = new Configuration({ basePath });
@@ -130,8 +132,6 @@ describe(testCase, () => {
 
     // 6. Instantiate the SDK dynamically with whatever port the API server ended up bound to (port 0)
     log.debug(`AddressInfo: `, addressInfo);
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-expect-error
     log.debug(`SDK base path: %s`, basePath);
 
     // 7. Assemble request to invoke the deploy contract method of the quorum ledger connector plugin via the REST API

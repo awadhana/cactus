@@ -11,21 +11,17 @@ import { SupplyChainApp } from "../../../main/typescript/public-api";
 
 const testCase =
   "can launch via CLI with generated API server .config.json file";
+const logLevel: LogLevelDesc = "TRACE";
 
 describe(testCase, () => {
-  const logLevel: LogLevelDesc = "TRACE";
   const configService = new ConfigService();
+  const exampleConfig = configService.newExampleConfig();
+  const convictConfig = configService.newExampleConfigConvict(exampleConfig);
+
   const appOptions: ISupplyChainAppOptions = {
     logLevel,
     disableSignalHandlers: true,
   };
-  const exampleConfig = configService.newExampleConfig();
-  const convictConfig = configService.newExampleConfigConvict(exampleConfig);
-
-  const env = configService.newExampleConfigEnv(convictConfig.getProperties());
-  const config = configService.getOrCreate({ env });
-  const apiSrvOpts = config.getProperties();
-  const { logLevel } = apiSr vOpts;
   const app = new SupplyChainApp(appOptions);
 
   beforeAll(async () => {
