@@ -92,6 +92,7 @@ describe(testCase, () => {
     rpcApiHttpHost = await ledger.getRpcApiHttpHost();
     const httpServer = apiServer.getHttpServerApi();
     addressInfo = httpServer?.address() as AddressInfo;
+
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-expect-error
     protocol = config.get("apiTlsEnabled") ? "https:" : "http:";
@@ -126,6 +127,7 @@ describe(testCase, () => {
 
     // 4. Start the API server which now is connected to the quorum ledger
     const apiServerStartOut = await apiServer.start();
+
     log.debug(`ApiServer.started OK:`, apiServerStartOut);
 
     expect(quorumGenesisOptions);
