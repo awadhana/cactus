@@ -60,7 +60,8 @@ describe(testCase, () => {
     rpcApiHttpHost: string,
     client: DefaultApi,
     quorumGenesisOptions: IQuorumGenesisOptions,
-    firstHighNetWorthAccount: string;
+    firstHighNetWorthAccount: string,
+    apiServerStartOut: AddressInfo;
 
   const apiServer = new ApiServer({
     config: config.getProperties(),
@@ -90,6 +91,8 @@ describe(testCase, () => {
   beforeAll(async () => {
     await ledger.start();
     rpcApiHttpHost = await ledger.getRpcApiHttpHost();
+    // Start the API server which now is connected to the quorum ledger
+    apiServerStartOut = await apiServer.start();
     const httpServer = apiServer.getHttpServerApi();
     addressInfo = httpServer?.address() as AddressInfo;
 
@@ -124,9 +127,6 @@ describe(testCase, () => {
       pluginRegistry: new PluginRegistry({ plugins: [kvStoragePlugin] }),
     });
     plugins.push(ledgerConnectorQuorum);
-
-    // 4. Start the API server which now is connected to the quorum ledger
-    const apiServerStartOut = await apiServer.start();
 
     log.debug(`ApiServer.started OK:`, apiServerStartOut);
 
