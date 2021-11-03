@@ -61,7 +61,11 @@ describe(testCase, () => {
     client: DefaultApi,
     quorumGenesisOptions: IQuorumGenesisOptions,
     firstHighNetWorthAccount: string,
-    apiServerStartOut: AddressInfo;
+    apiServerStartOut: {
+      addressInfoCockpit: AddressInfo;
+      addressInfoApi: AddressInfo;
+      addressInfoGrpc: AddressInfo;
+    };
 
   const apiServer = new ApiServer({
     config: config.getProperties(),
