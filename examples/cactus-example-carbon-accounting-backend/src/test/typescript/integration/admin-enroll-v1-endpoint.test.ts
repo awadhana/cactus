@@ -18,7 +18,10 @@ import {
   Servers,
 } from "@hyperledger/cactus-common";
 
-import { pruneDockerAllIfGithubAction } from "@hyperledger/cactus-test-tooling";
+import {
+  pruneDockerAllIfGithubAction,
+  Containers,
+} from "@hyperledger/cactus-test-tooling";
 
 import {
   AuthzScope,
@@ -41,26 +44,47 @@ describe(testCase, () => {
     address: string,
     port: number,
     carbonAccountingApp: CarbonAccountingApp,
-    apiBaseUrl: string;
+    apiBaseUrl: string,
+    jwtSignOptions: JWT.SignOptions,
+    apiClientBad: CarbonAccountingApi;
 
   beforeAll(async () => {
     const pruning = pruneDockerAllIfGithubAction({ logLevel });
     await expect(pruning).resolves.toBeTruthy();
   });
   afterAll(async () => {
-    const pruning = pruneDockerAllIfGithubAction({ logLevel });
-    await expect(pruning).resolves.toBeTruthy();
+    await Containers.logDiagnostics({ logLevel });
   });
   beforeAll(async () => {
     const jwtKeyPair = await JWK.generate("RSA", 4096);
     const jwtPublicKey = jwtKeyPair.toPEM(false);
     const configService = new ConfigService();
-    expressJwtOptions: expressJwt.Options = {
+    const expressJwtOptions: expressJwt.Options = {
       algorithms: ["RS256"],
       secret: jwtPublicKey,
       audience: "carbon-accounting-tool-servers-hostname-here",
       issuer: uuidv4(),
     };
+    const jwtPayload = {
+      name: "Peter",
+      scope: [AuthzScope.GroupAdmin],
+    };
+    const tokenWithScope = JWT.sign(jwtPayload, jwtKeyPair, jwtSignOptions);
+    const verification = JWT.verify(tokenWithScope, jwtKeyPair, jwtSignOptions);
+    expect(verification).toBeTruthy();
+    jwtSignOptions = {
+      algorithm: "RS256",
+      issuer: expressJwtOptions.issuer,
+      audience: expressJwtOptions.audience,
+    };
+    const configTokenWithScope = new Configuration({
+      basePath: apiBaseUrl,
+      baseOptions: {
+        headers: {
+          Authorization: `Bearer ${tokenWithScope}`,
+        },
+      },
+    });
     const socketIoJwtOptions = { secret: jwtPublicKey };
     const authorizationConfig: IAuthorizationConfig = {
       unprotectedEndpointExemptions: [],
@@ -69,6 +93,10 @@ describe(testCase, () => {
     };
     const httpGui = await Servers.startOnPreferredPort(3000);
     const httpApi = await Servers.startOnPreferredPort(4000);
+    expect(expressJwtOptions).toBeTruthy();
+    expect(httpGui.listening).toBe(true);
+    expect(httpApi.listening).toBe(true);
+
     const apiSrvOpts = configService.newExampleConfig();
     apiSrvOpts.authorizationProtocol = AuthorizationProtocol.JSON_WEB_TOKEN;
     apiSrvOpts.authorizationConfigJson = authorizationConfig;
@@ -88,8 +116,24 @@ describe(testCase, () => {
       httpApi,
       disableSignalHandlers: true,
     };
-    carbonAccountingApp = new CarbonAccountingApp(appOptions);
+    const tokenNoScope = JWT.sign({ scope: [] }, jwtKeyPair, jwtSignOptions);
+    const configTokenWithoutScope = new Configuration({
+      basePath: apiBaseUrl,
+      baseOptions: {
+        headers: {
+          Authorization: `Bearer ${tokenNoScope}`,
+        },
+      },
+    });
+    apiClientBad = new CarbonAccountingApi(configTokenWithoutScope);
 
+    carbonAccountingApp = new CarbonAccountingApp(appOptions);
+    const apiClient = new CarbonAccountingApi(configTokenWithScope);
+    const res = await apiClient.enrollAdminV1({
+      orgName: "Org1MSP",
+    });
+    expect(res).toBeTruthy();
+    expect(res.status).toBeWithin(200, 300);
     addressInfo = httpApi.address() as AddressInfo;
     ({ address, port } = addressInfo);
     apiBaseUrl = `http://${address}:${port}`;
@@ -100,9 +144,6 @@ describe(testCase, () => {
     await expect(pruning).resolves.toBeTruthy();
   });
   test(testCase, async () => {
-    expect(expressJwtOptions).toBeTruthy();
-    expect(httpGui.listening).toBe(true);
-    expect(httpApi.listening).toBe(true);
     expect(addressInfo).toBe(true);
     expect(addressInfo.address).toBe(true);
     expect(addressInfo.port).toBe(true);
@@ -112,54 +153,10 @@ describe(testCase, () => {
       log.error(`CarbonAccountingApp crashed. failing test...`, ex);
       throw ex;
     }
-
-    const jwtPayload = {
-      name: "Peter",
-      scope: [AuthzScope.GroupAdmin],
-    };
-    const jwtSignOptions: JWT.SignOptions = {
-      algorithm: "RS256",
-      issuer: expressJwtOptions.issuer,
-      audience: expressJwtOptions.audience,
-    };
-    const tokenWithScope = JWT.sign(jwtPayload, jwtKeyPair, jwtSignOptions);
-    const verification = JWT.verify(tokenWithScope, jwtKeyPair, jwtSignOptions);
-    expect(verification).toBeTruthy();
-
-    const configTokenWithScope = new Configuration({
-      basePath: apiBaseUrl,
-      baseOptions: {
-        headers: {
-          Authorization: `Bearer ${tokenWithScope}`,
-        },
-      },
-    });
-
-    const apiClient = new CarbonAccountingApi(configTokenWithScope);
-
-    const res = await apiClient.enrollAdminV1({
-      orgName: "Org1MSP",
-    });
-    expect(res).toBeTruthy();
-    expect(res.status).toBeWithin(200, 300);
-
-    const tokenNoScope = JWT.sign({ scope: [] }, jwtKeyPair, jwtSignOptions);
-
-    const configTokenWithoutScope = new Configuration({
-      basePath: apiBaseUrl,
-      baseOptions: {
-        headers: {
-          Authorization: `Bearer ${tokenNoScope}`,
-        },
-      },
-    });
-
-    const apiClientBad = new CarbonAccountingApi(configTokenWithoutScope);
-
     try {
       await apiClientBad.enrollAdminV1({ orgName: "does-not-matter" });
       fail("enroll admin response status === 403 FAIL");
-    } catch (out) {
+    } catch (out: any) {
       expect(out).toBeTruthy();
       expect(out.response).toBeTruthy();
       expect(out.response.status).toEqual(StatusCodes.FORBIDDEN);
