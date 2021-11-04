@@ -46,7 +46,8 @@ describe(testCase, () => {
     carbonAccountingApp: CarbonAccountingApp,
     apiBaseUrl: string,
     jwtSignOptions: JWT.SignOptions,
-    apiClientBad: CarbonAccountingApi;
+    apiClientBad: CarbonAccountingApi,
+    apiClient: CarbonAccountingApi;
 
   beforeAll(async () => {
     const pruning = pruneDockerAllIfGithubAction({ logLevel });
@@ -128,12 +129,7 @@ describe(testCase, () => {
     apiClientBad = new CarbonAccountingApi(configTokenWithoutScope);
 
     carbonAccountingApp = new CarbonAccountingApp(appOptions);
-    const apiClient = new CarbonAccountingApi(configTokenWithScope);
-    const res = await apiClient.enrollAdminV1({
-      orgName: "Org1MSP",
-    });
-    expect(res).toBeTruthy();
-    expect(res.status).toBeWithin(200, 300);
+    apiClient = new CarbonAccountingApi(configTokenWithScope);
     addressInfo = httpApi.address() as AddressInfo;
     ({ address, port } = addressInfo);
     apiBaseUrl = `http://${address}:${port}`;
@@ -144,15 +140,24 @@ describe(testCase, () => {
     await expect(pruning).resolves.toBeTruthy();
   });
   test(testCase, async () => {
-    expect(addressInfo).toBe(true);
-    expect(addressInfo.address).toBe(true);
-    expect(addressInfo.port).toBe(true);
+    expect(addressInfo).toBeTruthy;
+    expect(addressInfo.address).toBe("127.0.0.1");
+    expect(addressInfo.port).toBe(4000);
     try {
       await carbonAccountingApp.start();
     } catch (ex) {
       log.error(`CarbonAccountingApp crashed. failing test...`, ex);
       throw ex;
     }
+    try {
+      await apiClient.enrollAdminV1({
+        orgName: "Org1MSP",
+      });
+    } catch (out: any) {
+      expect(out).toBeTruthy();
+      expect(out.status).toBeWithin(200, 300);
+    }
+
     try {
       await apiClientBad.enrollAdminV1({ orgName: "does-not-matter" });
       fail("enroll admin response status === 403 FAIL");
