@@ -1,10 +1,10 @@
 import "jest-extended";
-import test, { Test } from "tape";
+// import test, { Test } from "tape";
 
 import { Bools } from "../../../main/typescript/public-api";
 
-test("Bools", (tParent: Test) => {
-  test("Checks#isBooleanStrict()", (t: Test) => {
+describe("Bools", () => {
+  test("Checks#isBooleanStrict()", () => {
     expect(Bools.isBooleanStrict(true)).toBe(true);
     expect(Bools.isBooleanStrict(false)).toBe(true);
 
@@ -15,10 +15,9 @@ test("Bools", (tParent: Test) => {
     expect(Bools.isBooleanStrict({})).not.toBe(true);
     expect(Bools.isBooleanStrict(+0)).not.toBe(true);
     expect(Bools.isBooleanStrict(-0)).not.toBe(true);
-    t.end();
   });
 
-  test("isBooleanStrict()", async (t: Test) => {
+  test("isBooleanStrict()", async () => {
     expect(Bools.isBooleanStrict(true)).toBe(true);
     expect(Bools.isBooleanStrict(false)).toBe(true);
 
@@ -36,7 +35,5 @@ test("Bools", (tParent: Test) => {
     expect(Bools.isBooleanStrict(Number(0)));
     expect(Bools.isBooleanStrict(Infinity));
     expect(Bools.isBooleanStrict(NaN));
-    t.end();
   });
-  tParent.end();
 });
