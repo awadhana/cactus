@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 import "jest-extended";
-import test, { Test } from "tape-promise/tape";
+// import test, { Test } from "tape-promise/tape";
 
 import { PluginRegistry } from "@hyperledger/cactus-core";
 import {
@@ -15,21 +15,19 @@ import HelloWorldContractJson from "../../../../solidity/hello-world-contract/He
 import Web3 from "web3";
 import { PluginImportType } from "@hyperledger/cactus-core-api";
 
-test("can get balance of an account", async (t: Test) => {
-  t.comment("I'm just here for the error of no t in the method");
-
+describe("can get balance of an account", async () => {
   const logLevel: LogLevelDesc = "TRACE";
   const besuTestLedger = new BesuTestLedger();
   await besuTestLedger.start();
 
-  test.onFinish(async () => {
+  afterAll(async () => {
     await besuTestLedger.stop();
     await besuTestLedger.destroy();
   });
-
+  // beforeAll(async () => {
   const rpcApiHttpHost = await besuTestLedger.getRpcApiHttpHost();
   const rpcApiWsHost = await besuTestLedger.getRpcApiWsHost();
-
+  // });
   /**
    * Constant defining the standard 'dev' Besu genesis.json contents.
    *

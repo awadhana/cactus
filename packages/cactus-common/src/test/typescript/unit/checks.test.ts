@@ -1,11 +1,11 @@
 import "jest-extended";
-import test, { Test } from "tape-promise/tape";
+// import test, { Test } from "tape-promise/tape";
 import { v4 as uuidv4 } from "uuid";
 
 import { Checks } from "../../../main/typescript";
 
-test("Checks", () => {
-  test("Checks#nonBlankString()", (t: Test) => {
+describe("Checks", () => {
+  test("Checks#nonBlankString()", () => {
     const subject = uuidv4();
     const pattern = new RegExp(`${subject}`);
 
@@ -37,10 +37,9 @@ test("Checks", () => {
     expect(() => Checks.nonBlankString("-")).not.toThrow();
     expect(() => Checks.nonBlankString(" a ")).not.toThrow();
     expect(() => Checks.nonBlankString("\na\t")).not.toThrow();
-    t.end();
   });
 
-  test("#truthy()", (t: Test) => {
+  test("#truthy()", () => {
     expect(() => Checks.truthy(false)).toThrow();
     expect(() => Checks.truthy(NaN)).toThrow();
     expect(() => Checks.truthy(null)).toThrow();
@@ -51,6 +50,5 @@ test("Checks", () => {
     expect(() => Checks.truthy({})).not.toThrow();
     expect(() => Checks.truthy([])).not.toThrow();
     expect(() => Checks.truthy("OK")).not.toThrow();
-    t.end();
   });
 });
