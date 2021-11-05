@@ -15,7 +15,8 @@ import HelloWorldContractJson from "../../../../solidity/hello-world-contract/He
 import Web3 from "web3";
 import { PluginImportType } from "@hyperledger/cactus-core-api";
 
-describe("can get balance of an account", async () => {
+const testcase = "can get balance of an account";
+describe(testcase, async () => {
   const logLevel: LogLevelDesc = "TRACE";
   const besuTestLedger = new BesuTestLedger();
   await besuTestLedger.start();
@@ -48,24 +49,26 @@ describe("can get balance of an account", async () => {
     backend: new Map([[keychainEntryKey, keychainEntryValue]]),
     logLevel,
   });
-  keychainPlugin.set(
-    HelloWorldContractJson.contractName,
-    JSON.stringify(HelloWorldContractJson),
-  );
-  const factory = new PluginFactoryLedgerConnector({
-    pluginImportType: PluginImportType.Local,
-  });
-  const connector: PluginLedgerConnectorBesu = await factory.create({
-    rpcApiHttpHost,
-    rpcApiWsHost,
-    instanceId: uuidv4(),
-    pluginRegistry: new PluginRegistry({ plugins: [keychainPlugin] }),
-  });
-  await connector.onPluginInit();
+  test(testcase, async () => {
+    keychainPlugin.set(
+      HelloWorldContractJson.contractName,
+      JSON.stringify(HelloWorldContractJson),
+    );
+    const factory = new PluginFactoryLedgerConnector({
+      pluginImportType: PluginImportType.Local,
+    });
+    const connector: PluginLedgerConnectorBesu = await factory.create({
+      rpcApiHttpHost,
+      rpcApiWsHost,
+      instanceId: uuidv4(),
+      pluginRegistry: new PluginRegistry({ plugins: [keychainPlugin] }),
+    });
+    await connector.onPluginInit();
 
-  const req: GetBalanceV1Request = { address: firstHighNetWorthAccount };
-  const currentBalance = await connector.getBalance(req);
-  //makes the information in to string
-  expect(currentBalance).toBeTruthy();
-  expect(typeof currentBalance).toBe("object");
+    const req: GetBalanceV1Request = { address: firstHighNetWorthAccount };
+    const currentBalance = await connector.getBalance(req);
+    //makes the information in to string
+    expect(currentBalance).toBeTruthy();
+    expect(typeof currentBalance).toBe("object");
+  });
 });

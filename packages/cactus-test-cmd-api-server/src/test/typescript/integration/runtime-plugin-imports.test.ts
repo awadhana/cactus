@@ -1,7 +1,7 @@
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import "jest-extended";
-import test, { Test } from "tape-promise/tape";
+// import test, { Test } from "tape-promise/tape";
 
 import { LogLevelDesc } from "@hyperledger/cactus-common";
 
@@ -13,8 +13,8 @@ import {
 import { PluginImportType } from "@hyperledger/cactus-core-api";
 
 const logLevel: LogLevelDesc = "TRACE";
-
-test("can import plugins at runtime (CLI)", async (t: Test) => {
+const testCase = "can import plugins at runtime (CLI)";
+describe(testCase, () => {
   const pluginsPath = path.join(
     __dirname, // start at the current file's path
     "../../../../../../", // walk back up to the project root
@@ -22,7 +22,6 @@ test("can import plugins at runtime (CLI)", async (t: Test) => {
     uuidv4(), // then a random directory to ensure proper isolation
   );
   const pluginManagerOptionsJson = JSON.stringify({ pluginsPath });
-
   const configService = new ConfigService();
   const apiServerOptions = configService.newExampleConfig();
   apiServerOptions.authorizationProtocol = AuthorizationProtocol.NONE;
@@ -33,27 +32,25 @@ test("can import plugins at runtime (CLI)", async (t: Test) => {
   apiServerOptions.cockpitPort = 0;
   apiServerOptions.grpcPort = 0;
   apiServerOptions.apiTlsEnabled = false;
-  apiServerOptions.plugins = [
-    {
-      packageName: "@hyperledger/cactus-plugin-keychain-memory",
-      type: PluginImportType.Local,
-      options: {
-        instanceId: uuidv4(),
-        keychainId: uuidv4(),
-        logLevel,
-      },
-    },
-  ];
   const config = configService.newExampleConfigConvict(apiServerOptions);
 
   const apiServer = new ApiServer({
     config: config.getProperties(),
   });
+  afterAll(() => apiServer.shutdown());
 
-  await t.doesNotReject(
-    apiServer.start(),
-    "failed to start API server with dynamic plugin imports configured for it...",
-  );
-  test.onFinish(() => apiServer.shutdown());
-  t.end();
+  test(testCase, async () => {
+    apiServerOptions.plugins = [
+      {
+        packageName: "@hyperledger/cactus-plugin-keychain-memory",
+        type: PluginImportType.Local,
+        options: {
+          instanceId: uuidv4(),
+          keychainId: uuidv4(),
+          logLevel,
+        },
+      },
+    ];
+    await expect(apiServer.start()).toBeTruthy();
+  });
 });

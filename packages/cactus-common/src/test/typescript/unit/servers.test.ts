@@ -4,8 +4,8 @@ import test, { Test } from "tape-promise/tape";
 import "jest-extended";
 import { Servers } from "../../../main/typescript/index";
 
-test("Servers", async (tParent: Test) => {
-  test("Servers#listen()", async (t: Test) => {
+describe("Servers", async () => {
+  test("Servers#listen()", async () => {
     {
       const server = createServer();
       await t.rejects(
@@ -35,7 +35,7 @@ test("Servers", async (tParent: Test) => {
     }
   });
 
-  test("Servers#startOnPreferredPort()", async (t: Test) => {
+  test("Servers#startOnPreferredPort()", async () => {
     const prefPort = 4123;
     const host = "0.0.0.0";
     const portBlocker = createServer();
@@ -57,5 +57,4 @@ test("Servers", async (tParent: Test) => {
       expect(addressInfo.port).not.toEqual(prefPort);
     }, "Servers.startOnPreferredPort falls back without throwing OK");
   });
-  tParent.end();
 });

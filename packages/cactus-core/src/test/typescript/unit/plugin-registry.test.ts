@@ -5,7 +5,7 @@ import { PluginRegistry } from "../../../main/typescript/public-api";
 
 import { ICactusPlugin, IPluginKeychain } from "@hyperledger/cactus-core-api";
 
-test("PluginRegistry", () => {
+describe("PluginRegistry", () => {
   const keychainId = uuidv4();
   const instanceId = uuidv4();
 
