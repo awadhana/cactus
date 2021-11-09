@@ -1,105 +1,105 @@
-import { v4 as uuidv4 } from "uuid";
-import "jest-extended";
-import test, { Test } from "tape-promise/tape";
-import {
-  ApiServer,
-  AuthorizationProtocol,
-  ConfigService,
-} from "../../../main/typescript/public-api";
+// import { v4 as uuidv4 } from "uuid";
+// import "jest-extended";
+// // import test, { Test } from "tape-promise/tape";
+// import {
+//   ApiServer,
+//   AuthorizationProtocol,
+//   ConfigService,
+// } from "../../../main/typescript/public-api";
 
-import {
-  CactusKeychainVaultServer,
-  Containers,
-  K_DEFAULT_VAULT_DEV_ROOT_TOKEN,
-  K_DEFAULT_VAULT_HTTP_PORT,
-  VaultTestServer,
-} from "@hyperledger/cactus-test-tooling";
+// import {
+//   CactusKeychainVaultServer,
+//   Containers,
+//   K_DEFAULT_VAULT_DEV_ROOT_TOKEN,
+//   K_DEFAULT_VAULT_HTTP_PORT,
+//   VaultTestServer,
+// } from "@hyperledger/cactus-test-tooling";
 
-import { DefaultApi } from "@hyperledger/cactus-plugin-keychain-vault";
-import { Configuration, PluginImportType } from "@hyperledger/cactus-core-api";
-import path from "path";
+// import { DefaultApi } from "@hyperledger/cactus-plugin-keychain-vault";
+// import { Configuration, PluginImportType } from "@hyperledger/cactus-core-api";
+// import path from "path";
 
-test("NodeJS API server + Rust plugin work together", async (t: Test) => {
-  const vaultTestContainer = new VaultTestServer({});
-  await vaultTestContainer.start();
+// const testCase = "NodeJS API server + Rust plugin work together";
+// describe(testCase, async () => {
+//   const vaultTestContainer = new VaultTestServer({});
+//   await vaultTestContainer.start();
+//   const pluginsPath = path.join(
+//     __dirname, // start at the current file's path
+//     "../../../../../../", // walk back up to the project root
+//     ".tmp/test/cmd-api-server/remote-plugin-imports_test", // the dir path from the root
+//     uuidv4(), // then a random directory to ensure proper isolation
+//   );
+//   const pluginManagerOptionsJson = JSON.stringify({ pluginsPath });
 
-  const ci = await Containers.getById(vaultTestContainer.containerId);
-  const vaultIpAddr = await Containers.getContainerInternalIp(ci);
+//   const ci = await Containers.getById(vaultTestContainer.containerId);
+//   const vaultIpAddr = await Containers.getContainerInternalIp(ci);
+//   const configService = new ConfigService();
+//   const apiServerOptions = configService.newExampleConfig();
+//   apiServerOptions.authorizationProtocol = AuthorizationProtocol.NONE;
+//   apiServerOptions.pluginManagerOptionsJson = pluginManagerOptionsJson;
+//   apiServerOptions.configFile = "";
+//   apiServerOptions.apiCorsDomainCsv = "*";
+//   apiServerOptions.apiPort = 0;
+//   apiServerOptions.cockpitPort = 0;
+//   apiServerOptions.grpcPort = 0;
+//   apiServerOptions.apiTlsEnabled = false;
+//   const config = configService.newExampleConfigConvict(apiServerOptions);
 
-  test.onFinish(async () => {
-    await vaultTestContainer.stop();
-    await vaultTestContainer.destroy();
-  });
+//   const apiServer = new ApiServer({
+//     config: config.getProperties(),
+//   });
 
-  // const hostPortVault = await vaultTestContainer.getHostPortHttp();
-  const vaultHost = `http://${vaultIpAddr}:${K_DEFAULT_VAULT_HTTP_PORT}`;
+//   afterAll(async () => {
+//     await vaultTestContainer.stop();
+//     await vaultTestContainer.destroy();
+//   });
 
-  const pluginContainer = new CactusKeychainVaultServer({
-    envVars: [
-      `VAULT_HOST=${vaultHost}`,
-      `VAULT_TOKEN=${K_DEFAULT_VAULT_DEV_ROOT_TOKEN}`,
-      "HOST=0.0.0.0:8080",
-    ],
-  });
-  await pluginContainer.start();
+//   // const hostPortVault = await vaultTestContainer.getHostPortHttp();
+//   const vaultHost = `http://${vaultIpAddr}:${K_DEFAULT_VAULT_HTTP_PORT}`;
 
-  test.onFinish(async () => {
-    await pluginContainer.stop();
-    await pluginContainer.destroy();
-  });
+//   const pluginContainer = new CactusKeychainVaultServer({
+//     envVars: [
+//       `VAULT_HOST=${vaultHost}`,
+//       `VAULT_TOKEN=${K_DEFAULT_VAULT_DEV_ROOT_TOKEN}`,
+//       "HOST=0.0.0.0:8080",
+//     ],
+//   });
+//   await pluginContainer.start();
 
-  const hostPort = await pluginContainer.getHostPortHttp();
+//   afterAll(async () => {
+//     await pluginContainer.stop();
+//     await pluginContainer.destroy();
+//   });
 
-  const configuration = new Configuration({
-    basePath: `http://localhost:${hostPort}`,
-  });
-  const apiClient = new DefaultApi(configuration);
+//   const hostPort = await pluginContainer.getHostPortHttp();
 
-  const pluginsPath = path.join(
-    __dirname, // start at the current file's path
-    "../../../../../../", // walk back up to the project root
-    ".tmp/test/cmd-api-server/remote-plugin-imports_test", // the dir path from the root
-    uuidv4(), // then a random directory to ensure proper isolation
-  );
-  const pluginManagerOptionsJson = JSON.stringify({ pluginsPath });
+//   const configuration = new Configuration({
+//     basePath: `http://localhost:${hostPort}`,
+//   });
+//   const apiClient = new DefaultApi(configuration);
 
-  const configService = new ConfigService();
-  const apiServerOptions = configService.newExampleConfig();
-  apiServerOptions.authorizationProtocol = AuthorizationProtocol.NONE;
-  apiServerOptions.pluginManagerOptionsJson = pluginManagerOptionsJson;
-  apiServerOptions.configFile = "";
-  apiServerOptions.apiCorsDomainCsv = "*";
-  apiServerOptions.apiPort = 0;
-  apiServerOptions.cockpitPort = 0;
-  apiServerOptions.grpcPort = 0;
-  apiServerOptions.apiTlsEnabled = false;
-  apiServerOptions.plugins = [
-    {
-      packageName: "@hyperledger/cactus-plugin-keychain-vault",
-      type: PluginImportType.Remote,
-      options: {
-        keychainId: "_keychainId_",
-        instanceId: "_instanceId_",
-        remoteConfig: configuration,
-      },
-    },
-  ];
-  const config = configService.newExampleConfigConvict(apiServerOptions);
+//   apiServerOptions.plugins = [
+//     {
+//       packageName: "@hyperledger/cactus-plugin-keychain-vault",
+//       type: PluginImportType.Remote,
+//       options: {
+//         keychainId: "_keychainId_",
+//         instanceId: "_instanceId_",
+//         remoteConfig: configuration,
+//       },
+//     },
+//   ];
 
-  const apiServer = new ApiServer({
-    config: config.getProperties(),
-  });
+//   await t.doesNotReject(apiServer.start(), "Started API server OK");
+//   afterAll(() => apiServer.shutdown());
 
-  await t.doesNotReject(apiServer.start(), "Started API server OK");
-  test.onFinish(() => apiServer.shutdown());
+//   const key = uuidv4();
+//   const expected = uuidv4();
 
-  const key = uuidv4();
-  const expected = uuidv4();
+//   await apiClient.setKeychainEntryV1({ key, value: expected });
+//   const {
+//     data: { value: actual },
+//   } = await apiClient.getKeychainEntryV1({ key });
 
-  await apiClient.setKeychainEntryV1({ key, value: expected });
-  const {
-    data: { value: actual },
-  } = await apiClient.getKeychainEntryV1({ key });
-
-  expect(actual).toEqual(expected);
-});
+//   expect(actual).toEqual(expected);
+// });

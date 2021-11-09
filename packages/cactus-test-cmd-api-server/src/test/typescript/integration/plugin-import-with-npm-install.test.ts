@@ -1,7 +1,7 @@
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import "jest-extended";
-import test, { Test } from "tape-promise/tape";
+// import test, { Test } from "tape-promise/tape";
 
 import { JWK } from "jose";
 
@@ -20,7 +20,7 @@ import {
 
 const logLevel: LogLevelDesc = "TRACE";
 
-test("can instal plugins at runtime based on imports", async (t: Test) => {
+test("can instal plugins at runtime based on imports", async () => {
   // Adding a new plugin to update the prometheus metric K_CACTUS_API_SERVER_TOTAL_PLUGIN_IMPORTS
   const keyPair = await JWK.generate("EC", "secp256k1", { use: "sig" }, true);
   const keyPairPem = keyPair.toPEM(true);
@@ -78,12 +78,9 @@ test("can instal plugins at runtime based on imports", async (t: Test) => {
   });
 
   const startResponse = apiServer.start();
-  await t.doesNotReject(
-    startResponse,
-    "failed to start API server with dynamic plugin imports configured for it...",
-  );
+  await expect(startResponse).toBeTruthy();
   expect(startResponse).toBeTruthy();
 
   await startResponse;
-  test.onFinish(() => apiServer.shutdown());
+  afterAll(() => apiServer.shutdown());
 });
