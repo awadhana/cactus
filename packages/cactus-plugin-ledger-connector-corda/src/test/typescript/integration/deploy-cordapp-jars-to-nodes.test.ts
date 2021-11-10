@@ -37,339 +37,344 @@ import { K_CACTUS_CORDA_TOTAL_TX_COUNT } from "../../../main/typescript/promethe
 const logLevel: LogLevelDesc = "TRACE";
 
 test.skip("Tests are passing on the JVM side", async (t: Test) => {
-test("Tests are passing on the JVM side", async (t: Test) => {
-  t.comment("I'm just here for the error of no t in the method");
-  test.onFailure(async () => {
-    await Containers.logDiagnostics({ logLevel });
-  });
+  test("Tests are passing on the JVM side", async (t: Test) => {
+    t.comment("I'm just here for the error of no t in the method");
+    test.onFailure(async () => {
+      await Containers.logDiagnostics({ logLevel });
+    });
 
-  const ledger = new CordaTestLedger({
-    imageName: "ghcr.io/hyperledger/cactus-corda-4-6-all-in-one-obligation",
-    imageVersion: "2021-03-19-feat-686",
-    // imageName: "caio",
-    // imageVersion: "latest",
-    logLevel,
-  });
-  expect(ledger).toBeTruthy();
+    const ledger = new CordaTestLedger({
+      imageName: "ghcr.io/hyperledger/cactus-corda-4-6-all-in-one-obligation",
+      imageVersion: "2021-03-19-feat-686",
+      // imageName: "caio",
+      // imageVersion: "latest",
+      logLevel,
+    });
+    expect(ledger).toBeTruthy();
 
-  test.onFinish(async () => {
-    await ledger.stop();
-    await ledger.destroy();
-  });
-  const ledgerContainer = await ledger.start();
-  expect(ledgerContainer).toBeTruthy();
+    test.onFinish(async () => {
+      await ledger.stop();
+      await ledger.destroy();
+    });
+    const ledgerContainer = await ledger.start();
+    expect(ledgerContainer).toBeTruthy();
 
-  const corDappsDirPartyA = await ledger.getCorDappsDirPartyA();
-  const corDappsDirPartyB = await ledger.getCorDappsDirPartyB();
+    const corDappsDirPartyA = await ledger.getCorDappsDirPartyA();
+    const corDappsDirPartyB = await ledger.getCorDappsDirPartyB();
 
-  await ledger.logDebugPorts();
-  const partyARpcPort = await ledger.getRpcAPublicPort();
-  const partyBRpcPort = await ledger.getRpcBPublicPort();
+    await ledger.logDebugPorts();
+    const partyARpcPort = await ledger.getRpcAPublicPort();
+    const partyBRpcPort = await ledger.getRpcBPublicPort();
 
-  const jarFiles = await ledger.pullCordappJars(
-    SampleCordappEnum.BASIC_CORDAPP,
-  );
+    const jarFiles = await ledger.pullCordappJars(
+      SampleCordappEnum.BASIC_CORDAPP,
+    );
 
-  const internalIpOrUndefined = await internalIpV4();
-  expect(internalIpOrUndefined).toBeTruthy();
-  const internalIp = internalIpOrUndefined as string;
+    const internalIpOrUndefined = await internalIpV4();
+    expect(internalIpOrUndefined).toBeTruthy();
+    const internalIp = internalIpOrUndefined as string;
 
-  // TODO: parse the gradle build files to extract the credentials?
-  const partyARpcUsername = "user1";
-  const partyARpcPassword = "password";
-  const partyBRpcUsername = partyARpcUsername;
-  const partyBRpcPassword = partyARpcPassword;
-  const springAppConfig = {
-    logging: {
-      level: {
-        root: "INFO",
-        "net.corda": "INFO",
-        "org.hyperledger.cactus": "DEBUG",
-      },
-    },
-    cactus: {
-      corda: {
-        node: { host: internalIp },
-        rpc: {
-          port: partyARpcPort,
-          username: partyARpcUsername,
-          password: partyARpcPassword,
+    // TODO: parse the gradle build files to extract the credentials?
+    const partyARpcUsername = "user1";
+    const partyARpcPassword = "password";
+    const partyBRpcUsername = partyARpcUsername;
+    const partyBRpcPassword = partyARpcPassword;
+    const springAppConfig = {
+      logging: {
+        level: {
+          root: "INFO",
+          "net.corda": "INFO",
+          "org.hyperledger.cactus": "DEBUG",
         },
       },
-    },
-  };
-  const springApplicationJson = JSON.stringify(springAppConfig);
-  const envVarSpringAppJson = `SPRING_APPLICATION_JSON=${springApplicationJson}`;
+      cactus: {
+        corda: {
+          node: { host: internalIp },
+          rpc: {
+            port: partyARpcPort,
+            username: partyARpcUsername,
+            password: partyARpcPassword,
+          },
+        },
+      },
+    };
+    const springApplicationJson = JSON.stringify(springAppConfig);
+    const envVarSpringAppJson = `SPRING_APPLICATION_JSON=${springApplicationJson}`;
 
-  const connector = new CordaConnectorContainer({
-    logLevel,
-    imageName: "ghcr.io/hyperledger/cactus-connector-corda-server",
-    imageVersion: "2021-03-25-feat-622",
-    // imageName: "cccs",
-    // imageVersion: "latest",
-    envVars: [envVarSpringAppJson],
-  });
-  expect(CordaConnectorContainer).toBeTruthy();
+    const connector = new CordaConnectorContainer({
+      logLevel,
+      imageName: "ghcr.io/hyperledger/cactus-connector-corda-server",
+      imageVersion: "2021-03-25-feat-622",
+      // imageName: "cccs",
+      // imageVersion: "latest",
+      envVars: [envVarSpringAppJson],
+    });
+    expect(CordaConnectorContainer).toBeTruthy();
 
-  test.onFinish(async () => {
-    try {
-      await connector.stop();
-    } finally {
-      await connector.destroy();
+    test.onFinish(async () => {
+      try {
+        await connector.stop();
+      } finally {
+        await connector.destroy();
+      }
+    });
+
+    const connectorContainer = await connector.start();
+    expect(connectorContainer).toBeTruthy();
+
+    await connector.logDebugPorts();
+    const apiUrl = await connector.getApiLocalhostUrl();
+
+    const config = new Configuration({ basePath: apiUrl });
+    const apiClient = new CordaApi(config);
+
+    const flowsRes1 = await apiClient.listFlowsV1();
+    expect(flowsRes1.status).toBe(200);
+    expect(flowsRes1.data).toBeTruthy();
+    expect(flowsRes1.data.flowNames).toBeTruthy();
+    const flowNamesPreDeploy = flowsRes1.data.flowNames;
+
+    const sshConfig = await ledger.getSshConfig();
+    const hostKeyEntry = "not-used-right-now-so-this-does-not-matter... ;-(";
+
+    const cdcA: CordappDeploymentConfig = {
+      cordappDir: corDappsDirPartyA,
+      cordaNodeStartCmd: "supervisorctl start corda-a",
+      cordaJarPath:
+        "/samples-kotlin/Advanced/obligation-cordapp/build/nodes/ParticipantA/corda.jar",
+      nodeBaseDirPath:
+        "/samples-kotlin/Advanced/obligation-cordapp/build/nodes/ParticipantA/",
+      rpcCredentials: {
+        hostname: internalIp,
+        port: partyARpcPort,
+        username: partyARpcUsername,
+        password: partyARpcPassword,
+      },
+      sshCredentials: {
+        hostKeyEntry,
+        hostname: internalIp,
+        password: "root",
+        port: sshConfig.port as number,
+        username: sshConfig.username as string,
+      },
+    };
+
+    const cdcB: CordappDeploymentConfig = {
+      cordappDir: corDappsDirPartyB,
+      cordaNodeStartCmd: "supervisorctl start corda-b",
+      cordaJarPath:
+        "/samples-kotlin/Advanced/obligation-cordapp/build/nodes/ParticipantB/corda.jar",
+      nodeBaseDirPath:
+        "/samples-kotlin/Advanced/obligation-cordapp/build/nodes/ParticipantB/",
+      rpcCredentials: {
+        hostname: internalIp,
+        port: partyBRpcPort,
+        username: partyBRpcUsername,
+        password: partyBRpcPassword,
+      },
+      sshCredentials: {
+        hostKeyEntry,
+        hostname: internalIp,
+        password: "root",
+        port: sshConfig.port as number,
+        username: sshConfig.username as string,
+      },
+    };
+
+    const cordappDeploymentConfigs: CordappDeploymentConfig[] = [cdcA, cdcB];
+    const depReq: DeployContractJarsV1Request = {
+      jarFiles,
+      cordappDeploymentConfigs,
+    };
+    const depRes = await apiClient.deployContractJarsV1(depReq);
+    expect(depRes).toBeTruthy();
+    expect(depRes.status).toEqual(200);
+    expect(depRes.data).toBeTruthy();
+    expect(depRes.data.deployedJarFiles).toBeTruthy();
+    expect(depRes.data.deployedJarFiles.length).toEqual(jarFiles.length);
+
+    const flowsRes2 = await apiClient.listFlowsV1();
+    expect(flowsRes2.status).toBe(200);
+    expect(flowsRes2.data).toBeTruthy();
+    expect(flowsRes2.data.flowNames).toBeTruthy();
+    const flowNamesPostDeploy = flowsRes2.data.flowNames;
+    expect(flowNamesPostDeploy).not.toBe(flowNamesPreDeploy);
+
+    // let's see if this makes a difference and if yes, then we know that the issue
+    // is a race condition for sure
+    // await new Promise((r) => setTimeout(r, 120000));
+    const networkMapRes = await apiClient.networkMapV1();
+    expect(networkMapRes).toBeTruthy();
+    expect(networkMapRes.status).toBeTruthy();
+    expect(networkMapRes.data).toBeTruthy();
+    expect(Array.isArray(networkMapRes.data)).toBe(true);
+    expect(networkMapRes.data.length > 0).toBe(true);
+
+    // const partyA = networkMapRes.data.find((it) =>
+    //   it.legalIdentities.some((it2) => it2.name.organisation === "ParticipantA"),
+    // );
+    // const partyAPublicKey = partyA?.legalIdentities[0].owningKey;
+
+    const partyB = networkMapRes.data.find((it) =>
+      it.legalIdentities.some(
+        (it2) => it2.name.organisation === "ParticipantB",
+      ),
+    );
+    const partyBPublicKey = partyB?.legalIdentities[0].owningKey;
+
+    const req: InvokeContractV1Request = ({
+      timeoutMs: 60000,
+      flowFullClassName:
+        "net.corda.samples.example.flows.ExampleFlow$Initiator",
+      flowInvocationType: FlowInvocationType.FlowDynamic,
+      params: [
+        {
+          jvmTypeKind: JvmTypeKind.Primitive,
+          jvmType: {
+            fqClassName: "java.lang.Integer",
+          },
+          primitiveValue: 42,
+        },
+        {
+          jvmTypeKind: JvmTypeKind.Reference,
+          jvmType: {
+            fqClassName: "net.corda.core.identity.Party",
+          },
+          jvmCtorArgs: [
+            {
+              jvmTypeKind: JvmTypeKind.Reference,
+              jvmType: {
+                fqClassName: "net.corda.core.identity.CordaX500Name",
+              },
+              jvmCtorArgs: [
+                {
+                  jvmTypeKind: JvmTypeKind.Primitive,
+                  jvmType: {
+                    fqClassName: "java.lang.String",
+                  },
+                  primitiveValue: "ParticipantB",
+                },
+                {
+                  jvmTypeKind: JvmTypeKind.Primitive,
+                  jvmType: {
+                    fqClassName: "java.lang.String",
+                  },
+                  primitiveValue: "New York",
+                },
+                {
+                  jvmTypeKind: JvmTypeKind.Primitive,
+                  jvmType: {
+                    fqClassName: "java.lang.String",
+                  },
+                  primitiveValue: "US",
+                },
+              ],
+            },
+            {
+              jvmTypeKind: JvmTypeKind.Reference,
+              jvmType: {
+                fqClassName:
+                  "org.hyperledger.cactus.plugin.ledger.connector.corda.server.impl.PublicKeyImpl",
+              },
+              jvmCtorArgs: [
+                {
+                  jvmTypeKind: JvmTypeKind.Primitive,
+                  jvmType: {
+                    fqClassName: "java.lang.String",
+                  },
+                  primitiveValue: partyBPublicKey?.algorithm,
+                },
+                {
+                  jvmTypeKind: JvmTypeKind.Primitive,
+                  jvmType: {
+                    fqClassName: "java.lang.String",
+                  },
+                  primitiveValue: partyBPublicKey?.format,
+                },
+                {
+                  jvmTypeKind: JvmTypeKind.Primitive,
+                  jvmType: {
+                    fqClassName: "java.lang.String",
+                  },
+                  primitiveValue: partyBPublicKey?.encoded,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    } as unknown) as InvokeContractV1Request;
+
+    const res = await apiClient.invokeContractV1(req);
+    expect(res).toBeTruthy();
+    expect(res.status).toEqual(200);
+
+    const pluginOptions: IPluginLedgerConnectorCordaOptions = {
+      instanceId: uuidv4(),
+      corDappsDir: corDappsDirPartyA,
+      sshConfigAdminShell: sshConfig,
+    };
+
+    const plugin = new PluginLedgerConnectorCorda(pluginOptions);
+
+    const expressApp = express();
+    expressApp.use(bodyParser.json({ limit: "250mb" }));
+    const server = http.createServer(expressApp);
+    const listenOptions: IListenOptions = {
+      hostname: "0.0.0.0",
+      port: 0,
+      server,
+    };
+    const addressInfo = (await Servers.listen(listenOptions)) as AddressInfo;
+    test.onFinish(async () => await Servers.shutdown(server));
+    const { address, port } = addressInfo;
+    const apiHost = `http://${address}:${port}`;
+
+    const apiConfig = new Configuration({ basePath: apiHost });
+    const apiClient1 = new CordaApi(apiConfig);
+
+    await plugin.getOrCreateWebServices();
+    await plugin.registerWebServices(expressApp);
+
+    {
+      plugin.transact();
+      const promRes = await apiClient1.getPrometheusMetricsV1();
+      const promMetricsOutput =
+        "# HELP " +
+        K_CACTUS_CORDA_TOTAL_TX_COUNT +
+        " Total transactions executed\n" +
+        "# TYPE " +
+        K_CACTUS_CORDA_TOTAL_TX_COUNT +
+        " gauge\n" +
+        K_CACTUS_CORDA_TOTAL_TX_COUNT +
+        '{type="' +
+        K_CACTUS_CORDA_TOTAL_TX_COUNT +
+        '"} 1';
+      expect(promRes);
+      expect(promRes.data);
+      expect(promRes.status).toEqual(200);
+      expect(promRes.data.includes(promMetricsOutput)).toBe(true);
+
+      // Executing transaction to increment the Total transaction count metrics
+      plugin.transact();
+
+      const promRes1 = await apiClient1.getPrometheusMetricsV1();
+      const promMetricsOutput1 =
+        "# HELP " +
+        K_CACTUS_CORDA_TOTAL_TX_COUNT +
+        " Total transactions executed\n" +
+        "# TYPE " +
+        K_CACTUS_CORDA_TOTAL_TX_COUNT +
+        " gauge\n" +
+        K_CACTUS_CORDA_TOTAL_TX_COUNT +
+        '{type="' +
+        K_CACTUS_CORDA_TOTAL_TX_COUNT +
+        '"} 2';
+      expect(promRes1);
+      expect(promRes1.data);
+      expect(promRes1.status).toEqual(200);
+      expect(promRes1.data.includes(promMetricsOutput1)).toBe(true);
     }
   });
-
-  const connectorContainer = await connector.start();
-  expect(connectorContainer).toBeTruthy();
-
-  await connector.logDebugPorts();
-  const apiUrl = await connector.getApiLocalhostUrl();
-
-  const config = new Configuration({ basePath: apiUrl });
-  const apiClient = new CordaApi(config);
-
-  const flowsRes1 = await apiClient.listFlowsV1();
-  expect(flowsRes1.status).toBe(200);
-  expect(flowsRes1.data).toBeTruthy();
-  expect(flowsRes1.data.flowNames).toBeTruthy();
-  const flowNamesPreDeploy = flowsRes1.data.flowNames;
-
-  const sshConfig = await ledger.getSshConfig();
-  const hostKeyEntry = "not-used-right-now-so-this-does-not-matter... ;-(";
-
-  const cdcA: CordappDeploymentConfig = {
-    cordappDir: corDappsDirPartyA,
-    cordaNodeStartCmd: "supervisorctl start corda-a",
-    cordaJarPath:
-      "/samples-kotlin/Advanced/obligation-cordapp/build/nodes/ParticipantA/corda.jar",
-    nodeBaseDirPath:
-      "/samples-kotlin/Advanced/obligation-cordapp/build/nodes/ParticipantA/",
-    rpcCredentials: {
-      hostname: internalIp,
-      port: partyARpcPort,
-      username: partyARpcUsername,
-      password: partyARpcPassword,
-    },
-    sshCredentials: {
-      hostKeyEntry,
-      hostname: internalIp,
-      password: "root",
-      port: sshConfig.port as number,
-      username: sshConfig.username as string,
-    },
-  };
-
-  const cdcB: CordappDeploymentConfig = {
-    cordappDir: corDappsDirPartyB,
-    cordaNodeStartCmd: "supervisorctl start corda-b",
-    cordaJarPath:
-      "/samples-kotlin/Advanced/obligation-cordapp/build/nodes/ParticipantB/corda.jar",
-    nodeBaseDirPath:
-      "/samples-kotlin/Advanced/obligation-cordapp/build/nodes/ParticipantB/",
-    rpcCredentials: {
-      hostname: internalIp,
-      port: partyBRpcPort,
-      username: partyBRpcUsername,
-      password: partyBRpcPassword,
-    },
-    sshCredentials: {
-      hostKeyEntry,
-      hostname: internalIp,
-      password: "root",
-      port: sshConfig.port as number,
-      username: sshConfig.username as string,
-    },
-  };
-
-  const cordappDeploymentConfigs: CordappDeploymentConfig[] = [cdcA, cdcB];
-  const depReq: DeployContractJarsV1Request = {
-    jarFiles,
-    cordappDeploymentConfigs,
-  };
-  const depRes = await apiClient.deployContractJarsV1(depReq);
-  expect(depRes).toBeTruthy();
-  expect(depRes.status).toEqual(200);
-  expect(depRes.data).toBeTruthy();
-  expect(depRes.data.deployedJarFiles).toBeTruthy();
-  expect(depRes.data.deployedJarFiles.length).toEqual(jarFiles.length);
-
-  const flowsRes2 = await apiClient.listFlowsV1();
-  expect(flowsRes2.status).toBe(200);
-  expect(flowsRes2.data).toBeTruthy();
-  expect(flowsRes2.data.flowNames).toBeTruthy();
-  const flowNamesPostDeploy = flowsRes2.data.flowNames;
-  expect(flowNamesPostDeploy).not.toBe(flowNamesPreDeploy);
-
-  // let's see if this makes a difference and if yes, then we know that the issue
-  // is a race condition for sure
-  // await new Promise((r) => setTimeout(r, 120000));
-  const networkMapRes = await apiClient.networkMapV1();
-  expect(networkMapRes).toBeTruthy();
-  expect(networkMapRes.status).toBeTruthy();
-  expect(networkMapRes.data).toBeTruthy();
-  expect(Array.isArray(networkMapRes.data)).toBe(true);
-  expect(networkMapRes.data.length > 0).toBe(true);
-
-  // const partyA = networkMapRes.data.find((it) =>
-  //   it.legalIdentities.some((it2) => it2.name.organisation === "ParticipantA"),
-  // );
-  // const partyAPublicKey = partyA?.legalIdentities[0].owningKey;
-
-  const partyB = networkMapRes.data.find((it) =>
-    it.legalIdentities.some((it2) => it2.name.organisation === "ParticipantB"),
-  );
-  const partyBPublicKey = partyB?.legalIdentities[0].owningKey;
-
-  const req: InvokeContractV1Request = ({
-    timeoutMs: 60000,
-    flowFullClassName: "net.corda.samples.example.flows.ExampleFlow$Initiator",
-    flowInvocationType: FlowInvocationType.FlowDynamic,
-    params: [
-      {
-        jvmTypeKind: JvmTypeKind.Primitive,
-        jvmType: {
-          fqClassName: "java.lang.Integer",
-        },
-        primitiveValue: 42,
-      },
-      {
-        jvmTypeKind: JvmTypeKind.Reference,
-        jvmType: {
-          fqClassName: "net.corda.core.identity.Party",
-        },
-        jvmCtorArgs: [
-          {
-            jvmTypeKind: JvmTypeKind.Reference,
-            jvmType: {
-              fqClassName: "net.corda.core.identity.CordaX500Name",
-            },
-            jvmCtorArgs: [
-              {
-                jvmTypeKind: JvmTypeKind.Primitive,
-                jvmType: {
-                  fqClassName: "java.lang.String",
-                },
-                primitiveValue: "ParticipantB",
-              },
-              {
-                jvmTypeKind: JvmTypeKind.Primitive,
-                jvmType: {
-                  fqClassName: "java.lang.String",
-                },
-                primitiveValue: "New York",
-              },
-              {
-                jvmTypeKind: JvmTypeKind.Primitive,
-                jvmType: {
-                  fqClassName: "java.lang.String",
-                },
-                primitiveValue: "US",
-              },
-            ],
-          },
-          {
-            jvmTypeKind: JvmTypeKind.Reference,
-            jvmType: {
-              fqClassName:
-                "org.hyperledger.cactus.plugin.ledger.connector.corda.server.impl.PublicKeyImpl",
-            },
-            jvmCtorArgs: [
-              {
-                jvmTypeKind: JvmTypeKind.Primitive,
-                jvmType: {
-                  fqClassName: "java.lang.String",
-                },
-                primitiveValue: partyBPublicKey?.algorithm,
-              },
-              {
-                jvmTypeKind: JvmTypeKind.Primitive,
-                jvmType: {
-                  fqClassName: "java.lang.String",
-                },
-                primitiveValue: partyBPublicKey?.format,
-              },
-              {
-                jvmTypeKind: JvmTypeKind.Primitive,
-                jvmType: {
-                  fqClassName: "java.lang.String",
-                },
-                primitiveValue: partyBPublicKey?.encoded,
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  } as unknown) as InvokeContractV1Request;
-
-  const res = await apiClient.invokeContractV1(req);
-  expect(res).toBeTruthy();
-  expect(res.status).toEqual(200);
-
-  const pluginOptions: IPluginLedgerConnectorCordaOptions = {
-    instanceId: uuidv4(),
-    corDappsDir: corDappsDirPartyA,
-    sshConfigAdminShell: sshConfig,
-  };
-
-  const plugin = new PluginLedgerConnectorCorda(pluginOptions);
-
-  const expressApp = express();
-  expressApp.use(bodyParser.json({ limit: "250mb" }));
-  const server = http.createServer(expressApp);
-  const listenOptions: IListenOptions = {
-    hostname: "0.0.0.0",
-    port: 0,
-    server,
-  };
-  const addressInfo = (await Servers.listen(listenOptions)) as AddressInfo;
-  test.onFinish(async () => await Servers.shutdown(server));
-  const { address, port } = addressInfo;
-  const apiHost = `http://${address}:${port}`;
-
-  const apiConfig = new Configuration({ basePath: apiHost });
-  const apiClient1 = new CordaApi(apiConfig);
-
-  await plugin.getOrCreateWebServices();
-  await plugin.registerWebServices(expressApp);
-
-  {
-    plugin.transact();
-    const promRes = await apiClient1.getPrometheusMetricsV1();
-    const promMetricsOutput =
-      "# HELP " +
-      K_CACTUS_CORDA_TOTAL_TX_COUNT +
-      " Total transactions executed\n" +
-      "# TYPE " +
-      K_CACTUS_CORDA_TOTAL_TX_COUNT +
-      " gauge\n" +
-      K_CACTUS_CORDA_TOTAL_TX_COUNT +
-      '{type="' +
-      K_CACTUS_CORDA_TOTAL_TX_COUNT +
-      '"} 1';
-    expect(promRes);
-    expect(promRes.data);
-    expect(promRes.status).toEqual(200);
-    expect(promRes.data.includes(promMetricsOutput)).toBe(true);
-
-    // Executing transaction to increment the Total transaction count metrics
-    plugin.transact();
-
-    const promRes1 = await apiClient1.getPrometheusMetricsV1();
-    const promMetricsOutput1 =
-      "# HELP " +
-      K_CACTUS_CORDA_TOTAL_TX_COUNT +
-      " Total transactions executed\n" +
-      "# TYPE " +
-      K_CACTUS_CORDA_TOTAL_TX_COUNT +
-      " gauge\n" +
-      K_CACTUS_CORDA_TOTAL_TX_COUNT +
-      '{type="' +
-      K_CACTUS_CORDA_TOTAL_TX_COUNT +
-      '"} 2';
-    expect(promRes1);
-    expect(promRes1.data);
-    expect(promRes1.status).toEqual(200);
-    expect(promRes1.data.includes(promMetricsOutput1)).toBe(true);
-  }
+  t.end();
 });
