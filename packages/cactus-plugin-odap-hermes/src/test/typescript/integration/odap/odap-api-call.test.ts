@@ -1,7 +1,7 @@
 import http from "http";
 import { AddressInfo } from "net";
 import secp256k1 from "secp256k1";
-import test, { Test } from "tape-promise/tape";
+import "jest-extended";
 import { v4 as uuidv4 } from "uuid";
 import { randomBytes } from "crypto";
 import { PluginObjectStoreIpfs } from "@hyperledger/cactus-plugin-object-store-ipfs";
@@ -26,7 +26,10 @@ import {
   OdapGateway,
   OdapGatewayConstructorOptions,
 } from "../../../../main/typescript/gateway/odap-gateway";
-import { GoIpfsTestContainer } from "@hyperledger/cactus-test-tooling";
+import {
+  GoIpfsTestContainer,
+  pruneDockerAllIfGithubAction,
+} from "@hyperledger/cactus-test-tooling";
 
 /**
  * Use this to debug issues with the fabric node SDK
@@ -36,37 +39,53 @@ import { GoIpfsTestContainer } from "@hyperledger/cactus-test-tooling";
  */
 let ipfsApiHost: string;
 const testCase = "runs odap gateway tests via openApi";
-const logLevel: LogLevelDesc = "TRACE";
 let ipfsContainer: GoIpfsTestContainer;
-test("BEFORE " + testCase, async (t: Test) => {
-  ipfsContainer = new GoIpfsTestContainer({ logLevel });
-  t.ok(ipfsContainer, "GoIpfsTestContainer instance truthy OK");
-  {
-    const container = await ipfsContainer.start();
-    t.ok(container, "Container returned by start() truthy OK");
-    t.ok(container, "Started GoIpfsTestContainer OK");
 
-    const expressApp = express();
-    expressApp.use(bodyParser.json({ limit: "250mb" }));
-    const server = http.createServer(expressApp);
-    const listenOptions: IListenOptions = {
-      hostname: "0.0.0.0",
-      port: 0,
-      server,
-    };
-    const addressInfo = (await Servers.listen(listenOptions)) as AddressInfo;
-    test.onFinish(async () => await Servers.shutdown(server));
-    const { address, port } = addressInfo;
-    const apiHost = `http://${address}:${port}`;
-    ipfsApiHost = apiHost;
-    const config = new Configuration({ basePath: apiHost });
-    const apiClient = new ObjectStoreIpfsApi(config);
-    t.ok(apiClient, "ObjectStoreIpfsApi truthy OK");
+describe(testCase, () => {
+  const logLevel: LogLevelDesc = "TRACE";
+  const expressApp = express();
+  expressApp.use(bodyParser.json({ limit: "250mb" }));
+  const server = http.createServer(expressApp);
 
+  beforeAll(async () => {
+    const pruning = pruneDockerAllIfGithubAction({ logLevel });
+    await expect(pruning).resolves.toBeTruthy();
+  });
+
+  afterAll(async () => {
+    await ipfsContainer.stop();
+    await ipfsContainer.destroy();
+  });
+  afterAll(async () => await Servers.shutdown(server));
+  afterAll(async () => {
+    const pruning = pruneDockerAllIfGithubAction({ logLevel });
+    await expect(pruning).resolves.toBeTruthy();
+  });
+
+  beforeAll(async () => {
+    ipfsContainer = new GoIpfsTestContainer({ logLevel });
+    expect(ipfsContainer).toBeTruthy();
+    {
+      const container = await ipfsContainer.start();
+      expect(container).toBeTruthy();
+      expect(container).toBeTruthy();
+      const listenOptions: IListenOptions = {
+        hostname: "0.0.0.0",
+        port: 0,
+        server,
+      };
+      const addressInfo = (await Servers.listen(listenOptions)) as AddressInfo;
+      const { address, port } = addressInfo;
+      const apiHost = `http://${address}:${port}`;
+      ipfsApiHost = apiHost;
+      const config = new Configuration({ basePath: apiHost });
+      const apiClient = new ObjectStoreIpfsApi(config);
+      expect(apiClient).toBeTruthy();
+    }
+  });
+  test(testCase, async () => {
     const ipfsApiUrl = await ipfsContainer.getApiUrl();
-    const ipfsGatewayUrl = await ipfsContainer.getWebGatewayUrl();
-    t.comment(`Go IPFS Test Container API URL: ${ipfsApiUrl}`);
-    t.comment(`Go IPFS Test Container Gateway URL: ${ipfsGatewayUrl}`);
+    // const ipfsGatewayUrl = await ipfsContainer.getWebGatewayUrl();
 
     const ipfsClientOrOptions = create({
       url: ipfsApiUrl,
@@ -83,109 +102,100 @@ test("BEFORE " + testCase, async (t: Test) => {
     await plugin.registerWebServices(expressApp);
 
     const packageName = plugin.getPackageName();
-    t.ok(packageName, "packageName truthy OK");
+    expect(packageName).toBeTruthy();
 
     const theInstanceId = plugin.getInstanceId();
-    t.ok(theInstanceId, "theInstanceId truthy OK");
-    t.equal(theInstanceId, instanceId, "instanceId === theInstanceId OK");
-  }
-  t.end();
-});
-
-test(testCase, async (t: Test) => {
-  test.onFinish(async () => {
-    await ipfsContainer.stop();
-    await ipfsContainer.destroy();
+    expect(theInstanceId).toBeTruthy();
+    expect(theInstanceId).toEqual(instanceId);
   });
-  const odapClientGateWayPluginID = uuidv4();
-  const odapPluginOptions: OdapGatewayConstructorOptions = {
-    name: "cactus-plugin#odapGateway",
-    dltIDs: ["dummy"],
-    instanceId: odapClientGateWayPluginID,
-    ipfsPath: ipfsApiHost,
-  };
-
-  const clientOdapGateway = new OdapGateway(odapPluginOptions);
-
-  const odapServerGatewayInstanceID = uuidv4();
-  let odapServerGatewayPubKey: string;
-  let odapServerGatewayApiHost: string;
-  {
-    const expressApp = express();
-    expressApp.use(bodyParser.json({ limit: "250mb" }));
-    const server = http.createServer(expressApp);
-    const listenOptions: IListenOptions = {
-      hostname: "localhost",
-      port: 0,
-      server,
-    };
-    const addressInfo = (await Servers.listen(listenOptions)) as AddressInfo;
-    test.onFinish(async () => await Servers.shutdown(server));
-    const { address, port } = addressInfo;
-    odapServerGatewayApiHost = `http://${address}:${port}`;
+  test(testCase, async () => {
+    const odapClientGateWayPluginID = uuidv4();
     const odapPluginOptions: OdapGatewayConstructorOptions = {
       name: "cactus-plugin#odapGateway",
       dltIDs: ["dummy"],
-      instanceId: odapServerGatewayInstanceID,
+      instanceId: odapClientGateWayPluginID,
       ipfsPath: ipfsApiHost,
     };
 
-    const plugin = new OdapGateway(odapPluginOptions);
-    odapServerGatewayPubKey = plugin.pubKey;
-    await plugin.getOrCreateWebServices();
-    await plugin.registerWebServices(expressApp);
-  }
-  {
-    const expressApp = express();
-    expressApp.use(bodyParser.json({ limit: "250mb" }));
-    const server = http.createServer(expressApp);
-    const listenOptions: IListenOptions = {
-      hostname: "localhost",
-      port: 0,
-      server,
-    };
-    const addressInfo = (await Servers.listen(listenOptions)) as AddressInfo;
-    test.onFinish(async () => await Servers.shutdown(server));
-    const { address, port } = addressInfo;
-    const apiHost = `http://${address}:${port}`;
-    const apiConfig = new Configuration({ basePath: apiHost });
-    const apiClient = new OdapApi(apiConfig);
-    await clientOdapGateway.getOrCreateWebServices();
-    await clientOdapGateway.registerWebServices(expressApp);
-    let dummyPrivKeyBytes = randomBytes(32);
-    while (!secp256k1.privateKeyVerify(dummyPrivKeyBytes)) {
-      dummyPrivKeyBytes = randomBytes(32);
+    const clientOdapGateway = new OdapGateway(odapPluginOptions);
+
+    const odapServerGatewayInstanceID = uuidv4();
+    let odapServerGatewayPubKey: string;
+    let odapServerGatewayApiHost: string;
+    {
+      const expressApp = express();
+      expressApp.use(bodyParser.json({ limit: "250mb" }));
+      const server = http.createServer(expressApp);
+      const listenOptions: IListenOptions = {
+        hostname: "localhost",
+        port: 0,
+        server,
+      };
+      const addressInfo = (await Servers.listen(listenOptions)) as AddressInfo;
+      const { address, port } = addressInfo;
+      odapServerGatewayApiHost = `http://${address}:${port}`;
+      const odapPluginOptions: OdapGatewayConstructorOptions = {
+        name: "cactus-plugin#odapGateway",
+        dltIDs: ["dummy"],
+        instanceId: odapServerGatewayInstanceID,
+        ipfsPath: ipfsApiHost,
+      };
+
+      const plugin = new OdapGateway(odapPluginOptions);
+      odapServerGatewayPubKey = plugin.pubKey;
+      await plugin.getOrCreateWebServices();
+      await plugin.registerWebServices(expressApp);
     }
-    const dummyPubKeyBytes = secp256k1.publicKeyCreate(dummyPrivKeyBytes);
-    const dummyPubKey = clientOdapGateway.bufArray2HexStr(dummyPubKeyBytes);
-    const expiryDate = new Date("23/25/2060").toString();
-    const assetProfile: AssetProfile = { expirationDate: expiryDate };
-    const odapClientRequest: SendClientV1Request = {
-      serverGatewayConfiguration: {
-        apiHost: odapServerGatewayApiHost,
-      },
-      version: "0.0.0",
-      loggingProfile: "dummy",
-      accessControlProfile: "dummy",
-      applicationProfile: "dummy",
-      payLoadProfile: {
+    {
+      const expressApp = express();
+      expressApp.use(bodyParser.json({ limit: "250mb" }));
+      const server = http.createServer(expressApp);
+      const listenOptions: IListenOptions = {
+        hostname: "localhost",
+        port: 0,
+        server,
+      };
+      const addressInfo = (await Servers.listen(listenOptions)) as AddressInfo;
+      const { address, port } = addressInfo;
+      const apiHost = `http://${address}:${port}`;
+      const apiConfig = new Configuration({ basePath: apiHost });
+      const apiClient = new OdapApi(apiConfig);
+      await clientOdapGateway.getOrCreateWebServices();
+      await clientOdapGateway.registerWebServices(expressApp);
+      let dummyPrivKeyBytes = randomBytes(32);
+      while (!secp256k1.privateKeyVerify(dummyPrivKeyBytes)) {
+        dummyPrivKeyBytes = randomBytes(32);
+      }
+      const dummyPubKeyBytes = secp256k1.publicKeyCreate(dummyPrivKeyBytes);
+      const dummyPubKey = clientOdapGateway.bufArray2HexStr(dummyPubKeyBytes);
+      const expiryDate = new Date("23/25/2060").toString();
+      const assetProfile: AssetProfile = { expirationDate: expiryDate };
+      const odapClientRequest: SendClientV1Request = {
+        serverGatewayConfiguration: {
+          apiHost: odapServerGatewayApiHost,
+        },
+        version: "0.0.0",
+        loggingProfile: "dummy",
+        accessControlProfile: "dummy",
+        applicationProfile: "dummy",
+        payLoadProfile: {
+          assetProfile: assetProfile,
+          capabilities: "",
+        },
         assetProfile: assetProfile,
-        capabilities: "",
-      },
-      assetProfile: assetProfile,
-      assetControlProfile: "dummy",
-      beneficiaryPubkey: dummyPubKey,
-      clientDltSystem: "dummy",
-      clientIdentityPubkey: clientOdapGateway.pubKey,
-      originatorPubkey: dummyPubKey,
-      recipientGateWayDltSystem: "dummy",
-      recipientGateWayPubkey: odapServerGatewayPubKey,
-      serverDltSystem: "dummy",
-      serverIdentityPubkey: dummyPubKey,
-      sourceGateWayDltSystem: "dummy",
-    };
-    const res = await apiClient.sendClientRequestV1(odapClientRequest);
-    t.ok(res);
-  }
-  t.end();
+        assetControlProfile: "dummy",
+        beneficiaryPubkey: dummyPubKey,
+        clientDltSystem: "dummy",
+        clientIdentityPubkey: clientOdapGateway.pubKey,
+        originatorPubkey: dummyPubKey,
+        recipientGateWayDltSystem: "dummy",
+        recipientGateWayPubkey: odapServerGatewayPubKey,
+        serverDltSystem: "dummy",
+        serverIdentityPubkey: dummyPubKey,
+        sourceGateWayDltSystem: "dummy",
+      };
+      const res = await apiClient.sendClientRequestV1(odapClientRequest);
+      expect(res).toBeTruthy();
+    }
+  });
 });
