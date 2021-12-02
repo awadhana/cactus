@@ -56,6 +56,7 @@ describe(testCase, () => {
     await ipfsContainer.stop();
     await ipfsContainer.destroy();
   });
+
   afterAll(async () => await Servers.shutdown(server));
   afterAll(async () => {
     const pruning = pruneDockerAllIfGithubAction({ logLevel });
