@@ -36,6 +36,9 @@ describe(testcase, () => {
   afterAll(async () => {
     await httpEchoContainer.stop();
     await httpEchoContainer.destroy();
+  });
+
+  afterAll(async () => {
     await anHttpEchoContainer.stop();
     await anHttpEchoContainer.destroy();
   });
