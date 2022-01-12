@@ -40,10 +40,9 @@ const testCase = "Test sign transaction endpoint";
 const logLevel: LogLevelDesc = "TRACE";
 
 describe(testCase, () => {
-  const besuTestLedger = new BesuTestLedger();
-  const httpServer1 = createServer();
   let addressInfo1: AddressInfo,
     node1Host,
+    besuTestLedger: BesuTestLedger,
     rpcApiHttpHost: string,
     rpcApiWsHost: string,
     configuration: BesuApiClientOptions,
@@ -77,9 +76,13 @@ describe(testCase, () => {
   });
 
   beforeAll(async () => {
-    await besuTestLedger.start();
+    const httpServer1 = createServer();
+    await new Promise((resolve, reject) => {
+      httpServer1.once("error", reject);
+      httpServer1.once("listening", resolve);
+      httpServer1.listen(0, "127.0.0.1");
+    });
     // Start the API server which is now listening on port A and it's healthcheck works through the main SDK
-    await apiServer.start();
     addressInfo1 = httpServer1.address() as AddressInfo;
     node1Host = `http://${addressInfo1.address}:${addressInfo1.port}`;
     configuration = new BesuApiClientOptions({ basePath: node1Host });
@@ -102,8 +105,14 @@ describe(testCase, () => {
       pluginRegistry,
     });
     api = new BesuApiClient(configuration);
+
+    besuTestLedger = new BesuTestLedger();
+    await besuTestLedger.start();
+
     rpcApiHttpHost = await besuTestLedger.getRpcApiHttpHost();
     rpcApiWsHost = await besuTestLedger.getRpcApiWsHost();
+
+    await apiServer.start();
   });
 
   // Make sure the API server is shut down when the testing if finished.
@@ -115,12 +124,6 @@ describe(testCase, () => {
   });
 
   test(testCase, async () => {
-    await new Promise((resolve, reject) => {
-      httpServer1.once("error", reject);
-      httpServer1.once("listening", resolve);
-      httpServer1.listen(0, "127.0.0.1");
-    });
-
     const jsObjectSignerOptions: IJsObjectSignerOptions = {
       privateKey: keyHex,
       logLevel,
