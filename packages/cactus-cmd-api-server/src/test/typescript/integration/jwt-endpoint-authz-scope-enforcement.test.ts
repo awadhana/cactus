@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
+import { RuntimeError } from "run-time-error";
 import {
   generateKeyPair,
   exportSPKI,
@@ -153,12 +154,16 @@ describe(testCase, () => {
           },
         });
         fail("deploy contract response status === 403 FAIL");
-      } catch (out: any) {
-        expect(out).toBeTruthy();
-        expect(out.response).toBeTruthy();
-        expect(out.response.status).toBe(StatusCodes.FORBIDDEN);
-        expect(out.response.data.data).not.toBeTruthy();
-        expect(out.response.data.success).not.toBeTruthy();
+      } catch (out: unknown) {
+        if (axios.isAxiosError(out)) {
+          expect(out).toBeTruthy();
+          expect(out.response).toBeTruthy();
+          expect(out.response?.status).toBe(StatusCodes.FORBIDDEN);
+          expect(out.response?.data.data).not.toBeTruthy();
+          expect(out.response?.data.success).not.toBeTruthy();
+        } else {
+          throw new RuntimeError("Message received :)", JSON.stringify(out));
+        }
       }
     } catch (ex) {
       log.error(ex);
