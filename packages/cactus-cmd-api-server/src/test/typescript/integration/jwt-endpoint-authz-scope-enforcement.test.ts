@@ -7,14 +7,11 @@ import {
   GenerateKeyPairResult,
 } from "jose";
 import "jest-extended";
-
 import expressJwt from "express-jwt";
 import axios, { Method } from "axios";
 import { StatusCodes } from "http-status-codes";
-
 import { LoggerProvider, LogLevelDesc } from "@hyperledger/cactus-common";
 import { PluginRegistry } from "@hyperledger/cactus-core";
-
 import {
   ApiServer,
   ConfigService,
@@ -22,7 +19,6 @@ import {
   IAuthorizationConfig,
   ICactusApiServerOptions,
 } from "../../../main/typescript/public-api";
-
 import { PluginLedgerConnectorStub } from "../fixtures/plugin-ledger-connector-stub/plugin-ledger-connector-stub";
 import { RunTransactionEndpoint } from "../fixtures/plugin-ledger-connector-stub/web-services/run-transaction-endpoint";
 import { DeployContractEndpoint } from "../fixtures/plugin-ledger-connector-stub/web-services/deploy-contract-endpoint";
