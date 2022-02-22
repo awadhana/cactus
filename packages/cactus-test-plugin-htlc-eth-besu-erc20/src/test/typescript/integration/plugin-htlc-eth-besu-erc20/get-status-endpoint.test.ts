@@ -53,359 +53,357 @@ const web3SigningCredential: Web3SigningCredential = {
 } as Web3SigningCredential;
 
 const testCase = "Test get status";
-const expressApp = express();
-expressApp.use(bodyParser.json({ limit: "250mb" }));
-const server = http.createServer(expressApp);
-const listenOptions: IListenOptions = {
-  hostname: "0.0.0.0",
-  port: 0,
-  server,
-};
-
-beforeAll(async () => {
-  const pruning = pruneDockerAllIfGithubAction({ logLevel });
-  await expect(pruning).resolves.toBeTruthy();
-});
-
-afterAll(async () => {
-  const pruning = pruneDockerAllIfGithubAction({ logLevel });
-  await expect(pruning).resolves.toBeTruthy();
-});
-
-afterAll(async () => {
-  await besuTestLedger.stop();
-  await besuTestLedger.destroy();
-  await pruneDockerAllIfGithubAction({ logLevel });
-});
-
-afterAll(async () => {
-  await besuTestLedger.stop();
-  await besuTestLedger.destroy();
-});
-
-afterAll(async () => await Servers.shutdown(server));
-
-test(testCase, async () => {
-  const besuTestLedger = new BesuTestLedger();
-  await besuTestLedger.start();
-
-  const rpcApiHttpHost = await besuTestLedger.getRpcApiHttpHost();
-  const rpcApiWsHost = await besuTestLedger.getRpcApiWsHost();
-  const keychainId = uuidv4();
-  const keychainPlugin = new PluginKeychainMemory({
-    instanceId: uuidv4(),
-    keychainId,
-    // pre-provision keychain with mock backend holding the private key of the
-    // test account that we'll reference while sending requests with the
-    // signing credential pointing to this keychain entry.
-    backend: new Map([
-      [TestTokenJSON.contractName, JSON.stringify(TestTokenJSON)],
-    ]),
-    logLevel,
-  });
-  keychainPlugin.set(
-    DemoHelperJSON.contractName,
-    JSON.stringify(DemoHelperJSON),
-  );
-  keychainPlugin.set(
-    HashTimeLockJSON.contractName,
-    JSON.stringify(HashTimeLockJSON),
-  );
-  const factory = new PluginFactoryLedgerConnector({
-    pluginImportType: PluginImportType.Local,
-  });
-
-  const pluginRegistry = new PluginRegistry({});
-  const connector: PluginLedgerConnectorBesu = await factory.create({
-    rpcApiHttpHost,
-    rpcApiWsHost,
-    logLevel,
-    instanceId: connectorId,
-    pluginRegistry: new PluginRegistry({ plugins: [keychainPlugin] }),
-  });
-
-  pluginRegistry.add(connector);
-  const pluginOptions: IPluginHtlcEthBesuErc20Options = {
-    instanceId: uuidv4(),
-    logLevel,
-    pluginRegistry,
+describe(testCase, () => {
+  const expressApp = express();
+  expressApp.use(bodyParser.json({ limit: "250mb" }));
+  const server = http.createServer(expressApp);
+  const listenOptions: IListenOptions = {
+    hostname: "0.0.0.0",
+    port: 0,
+    server,
   };
-
-  const factoryHTLC = new PluginFactoryHtlcEthBesuErc20({
-    pluginImportType: PluginImportType.Local,
+  let addressInfo,
+    address: string,
+    port: number,
+    apiHost,
+    configuration,
+    api: BesuApi;
+  beforeAll(async () => {
+    const pruning = pruneDockerAllIfGithubAction({ logLevel });
+    await expect(pruning).resolves.toBeTruthy();
+    addressInfo = (await Servers.listen(listenOptions)) as AddressInfo;
+    ({ address, port } = addressInfo);
+    apiHost = `http://${address}:${port}`;
+    configuration = new Configuration({ basePath: apiHost });
+    api = new BesuApi(configuration);
   });
-  const pluginHtlc = await factoryHTLC.create(pluginOptions);
-  pluginRegistry.add(pluginHtlc);
 
-  const addressInfo = (await Servers.listen(listenOptions)) as AddressInfo;
-  const { address, port } = addressInfo;
-  const apiHost = `http://${address}:${port}`;
-
-  const configuration = new Configuration({ basePath: apiHost });
-  const api = new BesuApi(configuration);
-
-  await pluginHtlc.getOrCreateWebServices();
-  await pluginHtlc.registerWebServices(expressApp);
-  const initRequest: InitializeRequest = {
-    connectorId,
-    keychainId,
-    constructorArgs: [],
-    web3SigningCredential,
-    gas: estimatedGas,
-  };
-  const deployOut = await pluginHtlc.initialize(initRequest);
-
-  expect(deployOut).toBeTruthy();
-  expect(deployOut.transactionReceipt).toBeTruthy();
-  expect(deployOut.transactionReceipt.contractAddress).toBeTruthy();
-  const hashTimeLockAddress = deployOut.transactionReceipt
-    .contractAddress as string;
-  const deployOutToken = await connector.deployContract({
-    contractName: TestTokenJSON.contractName,
-    contractAbi: TestTokenJSON.abi,
-    bytecode: TestTokenJSON.bytecode,
-    web3SigningCredential,
-    keychainId,
-    constructorArgs: ["100", "token", "2", "TKN"],
-    gas: estimatedGas,
+  afterAll(async () => {
+    const pruning = pruneDockerAllIfGithubAction({ logLevel });
+    await expect(pruning).resolves.toBeTruthy();
   });
-  expect(deployOutToken).toBeTruthy();
-  expect(deployOutToken.transactionReceipt).toBeTruthy();
-  expect(deployOutToken.transactionReceipt.contractAddress).toBeTruthy();
-  const tokenAddress = deployOutToken.transactionReceipt
-    .contractAddress as string;
 
-  const deployOutDemo = await connector.deployContract({
-    contractName: DemoHelperJSON.contractName,
-    contractAbi: DemoHelperJSON.abi,
-    bytecode: DemoHelperJSON.bytecode,
-    web3SigningCredential,
-    keychainId,
-    constructorArgs: [],
-    gas: estimatedGas,
+  afterAll(async () => {
+    await besuTestLedger.stop();
+    await besuTestLedger.destroy();
+    await pruneDockerAllIfGithubAction({ logLevel });
   });
-  expect(deployOutDemo).toBeTruthy();
-  expect(deployOutDemo.transactionReceipt).toBeTruthy();
-  expect(deployOutDemo.transactionReceipt.contractAddress).toBeTruthy();
 
-  const { success } = await connector.invokeContract({
-    contractName: TestTokenJSON.contractName,
-    keychainId,
-    signingCredential: web3SigningCredential,
-    invocationType: EthContractInvocationType.Send,
-    methodName: "approve",
-    params: [hashTimeLockAddress, "10"],
-    gas: estimatedGas,
+  afterAll(async () => {
+    await besuTestLedger.stop();
+    await besuTestLedger.destroy();
   });
-  expect(success).toBe(true);
 
-  const { callOutput } = await connector.invokeContract({
-    contractName: TestTokenJSON.contractName,
-    keychainId,
-    signingCredential: web3SigningCredential,
-    invocationType: EthContractInvocationType.Call,
-    methodName: "balanceOf",
-    params: [firstHighNetWorthAccount],
-  });
-  expect(callOutput).toEqual("100");
-  const responseAllowance = await connector.invokeContract({
-    contractName: TestTokenJSON.contractName,
-    keychainId,
-    signingCredential: web3SigningCredential,
-    invocationType: EthContractInvocationType.Call,
-    methodName: "allowance",
-    params: [firstHighNetWorthAccount, hashTimeLockAddress],
-  });
-  expect(responseAllowance.callOutput).toEqual("10");
+  afterAll(async () => await Servers.shutdown(server));
 
-  const request: NewContractRequest = {
-    contractAddress: hashTimeLockAddress,
-    inputAmount: 10,
-    outputAmount: 1,
-    expiration,
-    hashLock,
-    tokenAddress,
-    receiver,
-    outputNetwork: "BTC",
-    outputAddress: "1AcVYm7M3kkJQH28FXAvyBFQzFRL6xPKu8",
-    connectorId,
-    keychainId,
-    web3SigningCredential,
-    gas: estimatedGas,
-  };
-  const responseNewContract = await api.newContractV1(request);
-  expect(responseNewContract.status).toEqual(200);
+  test(testCase, async () => {
+    const besuTestLedger = new BesuTestLedger();
+    await besuTestLedger.start();
 
-  const responseTxId = await connector.invokeContract({
-    contractName: DemoHelperJSON.contractName,
-    keychainId,
-    signingCredential: web3SigningCredential,
-    invocationType: EthContractInvocationType.Call,
-    methodName: "getTxId",
-    params: [
-      firstHighNetWorthAccount,
-      receiver,
-      10,
-      hashLock,
+    const rpcApiHttpHost = await besuTestLedger.getRpcApiHttpHost();
+    const rpcApiWsHost = await besuTestLedger.getRpcApiWsHost();
+    const keychainId = uuidv4();
+    const keychainPlugin = new PluginKeychainMemory({
+      instanceId: uuidv4(),
+      keychainId,
+      // pre-provision keychain with mock backend holding the private key of the
+      // test account that we'll reference while sending requests with the
+      // signing credential pointing to this keychain entry.
+      backend: new Map([
+        [TestTokenJSON.contractName, JSON.stringify(TestTokenJSON)],
+      ]),
+      logLevel,
+    });
+    keychainPlugin.set(
+      DemoHelperJSON.contractName,
+      JSON.stringify(DemoHelperJSON),
+    );
+    keychainPlugin.set(
+      HashTimeLockJSON.contractName,
+      JSON.stringify(HashTimeLockJSON),
+    );
+    const factory = new PluginFactoryLedgerConnector({
+      pluginImportType: PluginImportType.Local,
+    });
+
+    const pluginRegistry = new PluginRegistry({});
+    const connector: PluginLedgerConnectorBesu = await factory.create({
+      rpcApiHttpHost,
+      rpcApiWsHost,
+      logLevel,
+      instanceId: connectorId,
+      pluginRegistry: new PluginRegistry({ plugins: [keychainPlugin] }),
+    });
+
+    pluginRegistry.add(connector);
+    const pluginOptions: IPluginHtlcEthBesuErc20Options = {
+      instanceId: uuidv4(),
+      logLevel,
+      pluginRegistry,
+    };
+
+    const factoryHTLC = new PluginFactoryHtlcEthBesuErc20({
+      pluginImportType: PluginImportType.Local,
+    });
+    const pluginHtlc = await factoryHTLC.create(pluginOptions);
+    pluginRegistry.add(pluginHtlc);
+
+    await pluginHtlc.getOrCreateWebServices();
+    await pluginHtlc.registerWebServices(expressApp);
+    const initRequest: InitializeRequest = {
+      connectorId,
+      keychainId,
+      constructorArgs: [],
+      web3SigningCredential,
+      gas: estimatedGas,
+    };
+    const deployOut = await pluginHtlc.initialize(initRequest);
+
+    expect(deployOut).toBeTruthy();
+    expect(deployOut.transactionReceipt).toBeTruthy();
+    expect(deployOut.transactionReceipt.contractAddress).toBeTruthy();
+    const hashTimeLockAddress = deployOut.transactionReceipt
+      .contractAddress as string;
+    const deployOutToken = await connector.deployContract({
+      contractName: TestTokenJSON.contractName,
+      contractAbi: TestTokenJSON.abi,
+      bytecode: TestTokenJSON.bytecode,
+      web3SigningCredential,
+      keychainId,
+      constructorArgs: ["100", "token", "2", "TKN"],
+      gas: estimatedGas,
+    });
+    expect(deployOutToken).toBeTruthy();
+    expect(deployOutToken.transactionReceipt).toBeTruthy();
+    expect(deployOutToken.transactionReceipt.contractAddress).toBeTruthy();
+    const tokenAddress = deployOutToken.transactionReceipt
+      .contractAddress as string;
+
+    const deployOutDemo = await connector.deployContract({
+      contractName: DemoHelperJSON.contractName,
+      contractAbi: DemoHelperJSON.abi,
+      bytecode: DemoHelperJSON.bytecode,
+      web3SigningCredential,
+      keychainId,
+      constructorArgs: [],
+      gas: estimatedGas,
+    });
+    expect(deployOutDemo).toBeTruthy();
+    expect(deployOutDemo.transactionReceipt).toBeTruthy();
+    expect(deployOutDemo.transactionReceipt.contractAddress).toBeTruthy();
+
+    const { success } = await connector.invokeContract({
+      contractName: TestTokenJSON.contractName,
+      keychainId,
+      signingCredential: web3SigningCredential,
+      invocationType: EthContractInvocationType.Send,
+      methodName: "approve",
+      params: [hashTimeLockAddress, "10"],
+      gas: estimatedGas,
+    });
+    expect(success).toBe(true);
+
+    const { callOutput } = await connector.invokeContract({
+      contractName: TestTokenJSON.contractName,
+      keychainId,
+      signingCredential: web3SigningCredential,
+      invocationType: EthContractInvocationType.Call,
+      methodName: "balanceOf",
+      params: [firstHighNetWorthAccount],
+    });
+    expect(callOutput).toEqual("100");
+    const responseAllowance = await connector.invokeContract({
+      contractName: TestTokenJSON.contractName,
+      keychainId,
+      signingCredential: web3SigningCredential,
+      invocationType: EthContractInvocationType.Call,
+      methodName: "allowance",
+      params: [firstHighNetWorthAccount, hashTimeLockAddress],
+    });
+    expect(responseAllowance.callOutput).toEqual("10");
+
+    const request: NewContractRequest = {
+      contractAddress: hashTimeLockAddress,
+      inputAmount: 10,
+      outputAmount: 1,
       expiration,
+      hashLock,
       tokenAddress,
-    ],
-  });
-  const ids = [responseTxId.callOutput as string];
-  const res = await api.getStatusV1({
-    ids,
-    web3SigningCredential,
-    connectorId,
-    keychainId,
-  });
-  expect(res.status).toEqual(200);
-  expect(res.data[0]).toEqual("1");
-});
+      receiver,
+      outputNetwork: "BTC",
+      outputAddress: "1AcVYm7M3kkJQH28FXAvyBFQzFRL6xPKu8",
+      connectorId,
+      keychainId,
+      web3SigningCredential,
+      gas: estimatedGas,
+    };
+    const responseNewContract = await api.newContractV1(request);
+    expect(responseNewContract.status).toEqual(200);
 
-test("Test get invalid id status", async () => {
-  await besuTestLedger.start();
-  const rpcApiHttpHost = await besuTestLedger.getRpcApiHttpHost();
-  const rpcApiWsHost = await besuTestLedger.getRpcApiWsHost();
-  const keychainId = uuidv4();
-  const keychainPlugin = new PluginKeychainMemory({
-    instanceId: uuidv4(),
-    keychainId,
-    // pre-provision keychain with mock backend holding the private key of the
-    // test account that we'll reference while sending requests with the
-    // signing credential pointing to this keychain entry.
-    backend: new Map([
-      [TestTokenJSON.contractName, JSON.stringify(TestTokenJSON)],
-    ]),
-    logLevel,
-  });
-  keychainPlugin.set(
-    DemoHelperJSON.contractName,
-    JSON.stringify(DemoHelperJSON),
-  );
-  keychainPlugin.set(
-    HashTimeLockJSON.contractName,
-    JSON.stringify(HashTimeLockJSON),
-  );
-  const factory = new PluginFactoryLedgerConnector({
-    pluginImportType: PluginImportType.Local,
+    const responseTxId = await connector.invokeContract({
+      contractName: DemoHelperJSON.contractName,
+      keychainId,
+      signingCredential: web3SigningCredential,
+      invocationType: EthContractInvocationType.Call,
+      methodName: "getTxId",
+      params: [
+        firstHighNetWorthAccount,
+        receiver,
+        10,
+        hashLock,
+        expiration,
+        tokenAddress,
+      ],
+    });
+    const ids = [responseTxId.callOutput as string];
+    const res = await api.getStatusV1({
+      ids,
+      web3SigningCredential,
+      connectorId,
+      keychainId,
+    });
+    expect(res.status).toEqual(200);
+    expect(res.data[0]).toEqual("1");
   });
 
-  const pluginRegistry = new PluginRegistry({});
-  const connector: PluginLedgerConnectorBesu = await factory.create({
-    rpcApiHttpHost,
-    rpcApiWsHost,
-    logLevel,
-    instanceId: connectorId,
-    pluginRegistry: new PluginRegistry({ plugins: [keychainPlugin] }),
+  test("Test get invalid id status", async () => {
+    await besuTestLedger.start();
+    const rpcApiHttpHost = await besuTestLedger.getRpcApiHttpHost();
+    const rpcApiWsHost = await besuTestLedger.getRpcApiWsHost();
+    const keychainId = uuidv4();
+    const keychainPlugin = new PluginKeychainMemory({
+      instanceId: uuidv4(),
+      keychainId,
+      // pre-provision keychain with mock backend holding the private key of the
+      // test account that we'll reference while sending requests with the
+      // signing credential pointing to this keychain entry.
+      backend: new Map([
+        [TestTokenJSON.contractName, JSON.stringify(TestTokenJSON)],
+      ]),
+      logLevel,
+    });
+    keychainPlugin.set(
+      DemoHelperJSON.contractName,
+      JSON.stringify(DemoHelperJSON),
+    );
+    keychainPlugin.set(
+      HashTimeLockJSON.contractName,
+      JSON.stringify(HashTimeLockJSON),
+    );
+    const factory = new PluginFactoryLedgerConnector({
+      pluginImportType: PluginImportType.Local,
+    });
+
+    const pluginRegistry = new PluginRegistry({});
+    const connector: PluginLedgerConnectorBesu = await factory.create({
+      rpcApiHttpHost,
+      rpcApiWsHost,
+      logLevel,
+      instanceId: connectorId,
+      pluginRegistry: new PluginRegistry({ plugins: [keychainPlugin] }),
+    });
+
+    pluginRegistry.add(connector);
+    const pluginOptions: IPluginHtlcEthBesuErc20Options = {
+      instanceId: uuidv4(),
+      logLevel,
+      pluginRegistry,
+    };
+
+    const factoryHTLC = new PluginFactoryHtlcEthBesuErc20({
+      pluginImportType: PluginImportType.Local,
+    });
+    const pluginHtlc = await factoryHTLC.create(pluginOptions);
+    pluginRegistry.add(pluginHtlc);
+
+    await pluginHtlc.getOrCreateWebServices();
+    await pluginHtlc.registerWebServices(expressApp);
+
+    const initRequest: InitializeRequest = {
+      connectorId,
+      keychainId,
+      constructorArgs: [],
+      web3SigningCredential,
+      gas: estimatedGas,
+    };
+    const deployOut = await pluginHtlc.initialize(initRequest);
+    expect(deployOut).toBeTruthy();
+    expect(deployOut.transactionReceipt).toBeTruthy();
+    expect(deployOut.transactionReceipt.contractAddress).toBeTruthy();
+    const hashTimeLockAddress = deployOut.transactionReceipt
+      .contractAddress as string;
+    const deployOutToken = await connector.deployContract({
+      contractName: TestTokenJSON.contractName,
+      contractAbi: TestTokenJSON.abi,
+      bytecode: TestTokenJSON.bytecode,
+      web3SigningCredential,
+      keychainId,
+      constructorArgs: ["100", "token", "2", "TKN"],
+      gas: estimatedGas,
+    });
+    expect(deployOutToken).toBeTruthy();
+    expect(deployOutToken.transactionReceipt).toBeTruthy();
+    expect(deployOutToken.transactionReceipt.contractAddress).toBeTruthy();
+    const tokenAddress = deployOutToken.transactionReceipt
+      .contractAddress as string;
+
+    const { success } = await connector.invokeContract({
+      contractName: TestTokenJSON.contractName,
+      signingCredential: web3SigningCredential,
+      invocationType: EthContractInvocationType.Send,
+      methodName: "approve",
+      keychainId,
+      params: [hashTimeLockAddress, "10"],
+      gas: estimatedGas,
+    });
+    expect(success).toEqual(true);
+
+    const { callOutput } = await connector.invokeContract({
+      contractName: TestTokenJSON.contractName,
+      keychainId,
+      signingCredential: web3SigningCredential,
+      invocationType: EthContractInvocationType.Call,
+      methodName: "balanceOf",
+      params: [firstHighNetWorthAccount],
+    });
+    expect(callOutput).toEqual("100");
+
+    const responseAllowance = await connector.invokeContract({
+      contractName: TestTokenJSON.contractName,
+      keychainId,
+      signingCredential: web3SigningCredential,
+      invocationType: EthContractInvocationType.Call,
+      methodName: "allowance",
+      params: [firstHighNetWorthAccount, hashTimeLockAddress],
+    });
+    expect(responseAllowance.callOutput).toEqual("10");
+
+    const request: NewContractRequest = {
+      contractAddress: hashTimeLockAddress,
+      inputAmount: 10,
+      outputAmount: 1,
+      expiration,
+      hashLock,
+      tokenAddress,
+      receiver,
+      outputNetwork: "BTC",
+      outputAddress: "1AcVYm7M3kkJQH28FXAvyBFQzFRL6xPKu8",
+      connectorId,
+      keychainId,
+      web3SigningCredential,
+      gas: estimatedGas,
+    };
+    const responseNewContract = await api.newContractV1(request);
+    expect(responseNewContract.status).toEqual(200);
+
+    const fakeId = "0x66616b654964";
+    const res = await api.getStatusV1({
+      ids: [fakeId],
+      web3SigningCredential,
+      connectorId,
+      keychainId,
+    });
+    expect(res.status).toEqual(200);
+    expect(res.data[0]).toEqual("0");
   });
-
-  pluginRegistry.add(connector);
-  const pluginOptions: IPluginHtlcEthBesuErc20Options = {
-    instanceId: uuidv4(),
-    logLevel,
-    pluginRegistry,
-  };
-
-  const factoryHTLC = new PluginFactoryHtlcEthBesuErc20({
-    pluginImportType: PluginImportType.Local,
-  });
-  const pluginHtlc = await factoryHTLC.create(pluginOptions);
-  pluginRegistry.add(pluginHtlc);
-
-  const addressInfo = (await Servers.listen(listenOptions)) as AddressInfo;
-  const { address, port } = addressInfo;
-  const apiHost = `http://${address}:${port}`;
-
-  const configuration = new Configuration({ basePath: apiHost });
-  const api = new BesuApi(configuration);
-
-  await pluginHtlc.getOrCreateWebServices();
-  await pluginHtlc.registerWebServices(expressApp);
-
-  const initRequest: InitializeRequest = {
-    connectorId,
-    keychainId,
-    constructorArgs: [],
-    web3SigningCredential,
-    gas: estimatedGas,
-  };
-  const deployOut = await pluginHtlc.initialize(initRequest);
-  expect(deployOut).toBeTruthy();
-  expect(deployOut.transactionReceipt).toBeTruthy();
-  expect(deployOut.transactionReceipt.contractAddress).toBeTruthy();
-  const hashTimeLockAddress = deployOut.transactionReceipt
-    .contractAddress as string;
-  const deployOutToken = await connector.deployContract({
-    contractName: TestTokenJSON.contractName,
-    contractAbi: TestTokenJSON.abi,
-    bytecode: TestTokenJSON.bytecode,
-    web3SigningCredential,
-    keychainId,
-    constructorArgs: ["100", "token", "2", "TKN"],
-    gas: estimatedGas,
-  });
-  expect(deployOutToken).toBeTruthy();
-  expect(deployOutToken.transactionReceipt).toBeTruthy();
-  expect(deployOutToken.transactionReceipt.contractAddress).toBeTruthy();
-  const tokenAddress = deployOutToken.transactionReceipt
-    .contractAddress as string;
-
-  const { success } = await connector.invokeContract({
-    contractName: TestTokenJSON.contractName,
-    signingCredential: web3SigningCredential,
-    invocationType: EthContractInvocationType.Send,
-    methodName: "approve",
-    keychainId,
-    params: [hashTimeLockAddress, "10"],
-    gas: estimatedGas,
-  });
-  expect(success).toEqual(true);
-
-  const { callOutput } = await connector.invokeContract({
-    contractName: TestTokenJSON.contractName,
-    keychainId,
-    signingCredential: web3SigningCredential,
-    invocationType: EthContractInvocationType.Call,
-    methodName: "balanceOf",
-    params: [firstHighNetWorthAccount],
-  });
-  expect(callOutput).toEqual("100");
-
-  const responseAllowance = await connector.invokeContract({
-    contractName: TestTokenJSON.contractName,
-    keychainId,
-    signingCredential: web3SigningCredential,
-    invocationType: EthContractInvocationType.Call,
-    methodName: "allowance",
-    params: [firstHighNetWorthAccount, hashTimeLockAddress],
-  });
-  expect(responseAllowance.callOutput).toEqual("10");
-
-  const request: NewContractRequest = {
-    contractAddress: hashTimeLockAddress,
-    inputAmount: 10,
-    outputAmount: 1,
-    expiration,
-    hashLock,
-    tokenAddress,
-    receiver,
-    outputNetwork: "BTC",
-    outputAddress: "1AcVYm7M3kkJQH28FXAvyBFQzFRL6xPKu8",
-    connectorId,
-    keychainId,
-    web3SigningCredential,
-    gas: estimatedGas,
-  };
-  const responseNewContract = await api.newContractV1(request);
-  expect(responseNewContract.status).toEqual(200);
-
-  const fakeId = "0x66616b654964";
-  const res = await api.getStatusV1({
-    ids: [fakeId],
-    web3SigningCredential,
-    connectorId,
-    keychainId,
-  });
-  expect(res.status).toEqual(200);
-  expect(res.data[0]).toEqual("0");
 });
